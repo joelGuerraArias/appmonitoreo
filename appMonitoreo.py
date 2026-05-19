@@ -3,6 +3,7 @@
 Video Analyzer Pro - Analizador de Videos con IA
 ================================================
 Versión: 3.0
+Release Nora: v1.1
 Autor: Video Analyzer Team
 
 Sistema de análisis de videos para detectar términos específicos,
@@ -1859,6 +1860,85 @@ def notificar_brevo_tangencial_inmediato_si(cliente, item_tangencial, caller_fun
             log_warning(f"⚠️ Tangencial inmediata Brevo omitida/error: {msg}", caller_func_name)
     except Exception as e:
         log_warning(f"⚠️ Tangencial inmediata Brevo excepción: {e}", caller_func_name)
+
+
+def enviar_tangencial_una_a_google_sheets(cliente, tangencial):
+    """
+    Añade una tangencial a la hoja del cliente.
+    Retorna (ok: bool, msg: str).
+    """
+    func_name = "enviar_tangencial_una_a_google_sheets"
+    if not tangencial:
+        return False, "Sin ítem tangencial"
+    if not cliente:
+        cliente = obtener_cliente_default()
+    gs = cliente.get("google_sheets") or {}
+    spreadsheet_id = (gs.get("spreadsheet_id") or "").strip()
+    rango = (gs.get("range") or "Hoja 1!A:G").strip()
+    if not gs.get("enabled") or not spreadsheet_id:
+        return False, "Google Sheets deshabilitado o sin spreadsheet_id"
+
+    termino = (tangencial.get("termino") or "").strip()
+    texto_gs = (
+        (tangencial.get("transcripcion_extracto") or "").strip()
+        or (tangencial.get("texto_evidencia") or "").strip()
+        or motivo_display_tangencial(tangencial)
+    )
+    url_gs = (tangencial.get("url_drive_video") or tangencial.get("video_url_drive") or "").strip()
+    motivo_t = motivo_display_tangencial(tangencial)
+    nombre_archivo = tangencial.get("archivo") or ""
+    cliente_nombre = cliente.get("nombre", cliente.get("id", "?"))
+
+    fila, incluir_indice, formato = construir_fila_google_sheet_cliente(
+        cliente=cliente,
+        nombre_archivo=nombre_archivo,
+        texto_gs=texto_gs,
+        sent_gs="Neutral",
+        url_gs=url_gs,
+        termino_encontrado=termino,
+        es_tangencial=True,
+        motivo_tangencial=motivo_t,
+    )
+    ok, msg = append_fila_google_sheet(
+        spreadsheet_id=spreadsheet_id,
+        range_a1=rango,
+        fila_valores=fila,
+        incluir_indice=incluir_indice,
+    )
+    if ok:
+        log_info(
+            f"Sheets tangencial enviado: cliente={cliente_nombre} formato={formato} termino={termino}",
+            func_name,
+        )
+    else:
+        log_warning(
+            f"Sheets tangencial falló: cliente={cliente_nombre} formato={formato} termino={termino} msg={msg}",
+            func_name,
+        )
+    return ok, msg
+
+
+def notificar_google_sheets_tangencial_inmediato_si(cliente, item_tangencial, caller_func_name):
+    """Sheets al detectar la tangencial (paralelo al correo inmediato). No interrumpe el análisis."""
+    if not item_tangencial:
+        return
+    if item_tangencial.get("sheets_enviado"):
+        return
+    try:
+        ok, msg = enviar_tangencial_una_a_google_sheets(cliente, item_tangencial)
+        if ok:
+            item_tangencial["sheets_enviado"] = True
+            log_info(
+                f"📊 Tangencial inmediata Sheets OK ({cliente.get('nombre', '?')}): {msg}",
+                caller_func_name,
+            )
+        else:
+            log_warning(
+                f"⚠️ Tangencial inmediata Sheets omitida/error: {msg}",
+                caller_func_name,
+            )
+    except Exception as e:
+        log_warning(f"⚠️ Tangencial inmediata Sheets excepción: {e}", caller_func_name)
 
 
 def enviar_brevo_menciones_tangenciales_cliente(cliente, items_list, hora_ciclo=None):
@@ -4163,6 +4243,8 @@ def enviar_tangenciales_a_google_sheets(menciones_tangenciales_data):
 
     resumen_por_cliente = {}
     for tangencial in menciones_tangenciales_data:
+        if tangencial.get("sheets_enviado"):
+            continue
         termino = (tangencial.get("termino") or "").strip()
         cliente = obtener_cliente_por_termino(termino)
         cliente = cliente or obtener_cliente_default()
@@ -4173,53 +4255,13 @@ def enviar_tangenciales_a_google_sheets(menciones_tangenciales_data):
             {"cliente_nombre": cliente_nombre, "ok": 0, "fail": 0, "errores": []},
         )
 
-        gs = cliente.get("google_sheets") or {}
-        spreadsheet_id = (gs.get("spreadsheet_id") or "").strip()
-        rango = (gs.get("range") or "Hoja 1!A:G").strip()
-        if not gs.get("enabled") or not spreadsheet_id:
-            bucket["fail"] += 1
-            bucket["errores"].append("Google Sheets deshabilitado o sin spreadsheet_id")
-            continue
-
-        texto_gs = (
-            (tangencial.get("transcripcion_extracto") or "").strip()
-            or (tangencial.get("texto_evidencia") or "").strip()
-            or motivo_display_tangencial(tangencial)
-        )
-        url_gs = (tangencial.get("url_drive_video") or tangencial.get("video_url_drive") or "").strip()
-        motivo_t = motivo_display_tangencial(tangencial)
-        sent_gs = "Neutral"
-        nombre_archivo = tangencial.get("archivo") or ""
-
-        fila, incluir_indice, formato = construir_fila_google_sheet_cliente(
-            cliente=cliente,
-            nombre_archivo=nombre_archivo,
-            texto_gs=texto_gs,
-            sent_gs=sent_gs,
-            url_gs=url_gs,
-            termino_encontrado=termino,
-            es_tangencial=True,
-            motivo_tangencial=motivo_t,
-        )
-        ok, msg = append_fila_google_sheet(
-            spreadsheet_id=spreadsheet_id,
-            range_a1=rango,
-            fila_valores=fila,
-            incluir_indice=incluir_indice,
-        )
+        ok, msg = enviar_tangencial_una_a_google_sheets(cliente, tangencial)
         if ok:
+            tangencial["sheets_enviado"] = True
             bucket["ok"] += 1
-            log_info(
-                f"Sheets tangencial enviado: cliente={cliente_nombre} formato={formato} termino={termino}",
-                func_name,
-            )
         else:
             bucket["fail"] += 1
             bucket["errores"].append(msg)
-            log_warning(
-                f"Sheets tangencial falló: cliente={cliente_nombre} formato={formato} termino={termino} msg={msg}",
-                func_name,
-            )
 
     return list(resumen_por_cliente.values())
 
@@ -12493,7 +12535,9 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                                     f"⚠️ DeepSeek tangencial (previo Brevo inmediato) omitido: {e_enr}",
                                     func_name,
                                 )
-                            notificar_brevo_tangencial_inmediato_si(obtener_cliente_por_termino(termino), _item_tang, func_name)
+                            _cli_tang = obtener_cliente_por_termino(termino)
+                            notificar_brevo_tangencial_inmediato_si(_cli_tang, _item_tang, func_name)
+                            notificar_google_sheets_tangencial_inmediato_si(_cli_tang, _item_tang, func_name)
                             continue  # ❌ NO GENERAR CLIP - SALTAR AL SIGUIENTE TÉRMINO
                         
                         # Usar los valores determinados por Gemini
@@ -12717,7 +12761,9 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                                             f"⚠️ DeepSeek tangencial (previo Brevo inmediato) omitido: {e_enr}",
                                             func_name,
                                         )
-                                    notificar_brevo_tangencial_inmediato_si(obtener_cliente_por_termino(termino), _item_tang, func_name)
+                                    _cli_tang = obtener_cliente_por_termino(termino)
+                                    notificar_brevo_tangencial_inmediato_si(_cli_tang, _item_tang, func_name)
+                                    notificar_google_sheets_tangencial_inmediato_si(_cli_tang, _item_tang, func_name)
                                     
                                     # Eliminar el clip generado
                                     if os.path.exists(clip_path):
@@ -13382,6 +13428,10 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
     
     # === GOOGLE SHEETS: menciones tangenciales por cliente (misma hoja del cliente) ===
     st.markdown("### 📊 Google Sheets — cierre de ciclo (tangenciales)")
+    st.caption(
+        "Las tangenciales ya se envían a Sheets **al detectarse** (igual que el correo inmediato). "
+        "Este bloque solo reintenta las que fallaron o quedaron pendientes."
+    )
     try:
         if not menciones_tangenciales_data:
             st.info("No hay tangenciales en este ciclo; no se envía nada a Sheets en este bloque.")

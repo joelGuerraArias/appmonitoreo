@@ -1,0 +1,77 @@
+{
+  "_comentario": "Archivo de ejemplo de programación para renamer.py",
+  "_instrucciones": [
+    "Copia este archivo a cada carpeta de videos como 'programacion.json'",
+    "Modifica los horarios y nombres según la programación real del canal",
+    "El formato de hora debe ser: 'HH:MM AM/PM' (ejemplo: '2:30 PM')",
+    "Los programas se asignan por proximidad de horario"
+  ],
+  "_canales_soportados": [
+    "CDN37 - Programación completa incluida",
+    "TELECENTRO - Programación base incluida", 
+    "TELEMICRO - Programación Univisión incluida",
+    "COLOR VISION - Programación genérica incluida",
+    "OTROS - Usar este ejemplo como plantilla"
+  ],
+  "programacion_ejemplo": [
+    {
+      "hora_inicio": "12:00 AM",
+      "nombre": "Programa de Medianoche",
+      "descripcion": "Opcional: descripción del programa"
+    },
+    {
+      "hora_inicio": "1:00 AM", 
+      "nombre": "Programa Madrugada"
+    },
+    {
+      "hora_inicio": "6:00 AM",
+      "nombre": "Buenos Días"
+    },
+    {
+      "hora_inicio": "8:00 AM",
+      "nombre": "Programa Matutino"
+    },
+    {
+      "hora_inicio": "10:00 AM",
+      "nombre": "Magazine de la Mañana"
+    },
+    {
+      "hora_inicio": "12:00 PM",
+      "nombre": "Noticias del Mediodía"
+    },
+    {
+      "hora_inicio": "1:00 PM",
+      "nombre": "Programa de la Tarde"
+    },
+    {
+      "hora_inicio": "3:00 PM",
+      "nombre": "Magazine Vespertino"
+    },
+    {
+      "hora_inicio": "5:00 PM",
+      "nombre": "Noticias de la Tarde"
+    },
+    {
+      "hora_inicio": "7:00 PM",
+      "nombre": "Programa Prime Time"
+    },
+    {
+      "hora_inicio": "9:00 PM",
+      "nombre": "Noticias Nocturnas"
+    },
+    {
+      "hora_inicio": "10:00 PM",
+      "nombre": "Programa de Noche"
+    },
+    {
+      "hora_inicio": "11:00 PM",
+      "nombre": "Cierre Informativo"
+    }
+  ],
+  "_notas_uso": [
+    "Elimina las líneas que empiecen con '_' antes de usar",
+    "Solo deja la lista 'programacion_ejemplo' renombrada como array principal",
+    "El archivo final debe ser una lista JSON simple",
+    "Ejemplo: [{'hora_inicio': '12:00 PM', 'nombre': 'Mi Programa'}]"
+  ]
+}

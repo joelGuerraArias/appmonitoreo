@@ -1,0 +1,40 @@
+---
+description: Aislar grabaciones (Video Analyzer) de radioAnalizer — no mezclar carpetas ni archivos
+alwaysApply: true
+---
+
+# Proyecto grabaciones — aislamiento de radioAnalizer
+
+Este workspace es **solo** `C:\Users\Joel Guerra\Desktop\grabaciones` (Video Analyzer / monitoreo de video).
+
+## Proyecto hermano (NO usar salvo petición explícita)
+
+| | grabaciones (este repo) | radioAnalizer (otro proyecto) |
+|--|-------------------------|-------------------------------|
+| Ruta | `Desktop\grabaciones\` | `Desktop\radioAnalizer\` |
+| App principal | `appMonitoreo.py` | `radioAnalizer.py` |
+| Medio | Video | Radio / audio |
+| Informe general | `appMonitoreo.py` → `append_informe_general` | `radioAnalizer.py` → `append_informe_general_radio` |
+
+## Reglas obligatorias para el agente
+
+1. **Editar y buscar código solo dentro de `grabaciones/`** (este workspace).
+2. **No copiar, portar ni “sincronizar”** cambios desde o hacia `Desktop\radioAnalizer\` sin que el usuario lo pida por nombre.
+3. App de este proyecto: **`grabaciones\appMonitoreo.py`** (no usar `radioAnalizer\VIDEOAnalizer3.py` ni `radioAnalizer.py`).
+4. Rutas por defecto de este proyecto:
+   - Procesados: `grabaciones\videos procesados\`
+   - Informe acumulativo: `%USERPROFILE%\Desktop\informes\informe_general.md` (vía `INFORME_GENERAL_PATH` en `appMonitoreo.py`)
+5. Ante dudas de “¿cuál script?” → asumir **grabaciones**, no radio.
+
+## Qué no hacer (evitar daños en el otro proyecto)
+
+- **Nunca editar** archivos bajo `Desktop\radioAnalizer\` desde una sesión de grabaciones.
+- No abrir `radioAnalizer.py` como referencia “porque es similar”.
+- No mezclar README/changelog de un proyecto en el otro.
+- No asumir que una función existe en grabaciones porque está en radioAnalizer (verificar con grep **solo en grabaciones**).
+- No portar cambios entre `appMonitoreo.py` (grabaciones) y scripts de `radioAnalizer\` salvo orden explícita.
+
+## Antes de guardar cambios
+
+- Confirmar que la ruta del archivo empieza por `...\grabaciones\`.
+- Script principal: `grabaciones\appMonitoreo.py`.

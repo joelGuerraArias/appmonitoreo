@@ -1,0 +1,18 @@
+{
+  "folders": [
+    {
+      "name": "grabaciones (Video Analyzer)",
+      "path": "."
+    }
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/__pycache__": true,
+      "**/.pytest_cache": true
+    },
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/__pycache__": true
+    }
+  }
+}

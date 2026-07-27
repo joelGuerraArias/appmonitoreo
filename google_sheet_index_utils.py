@@ -1,11 +1,17 @@
 # -*- coding: utf-8 -*-
-"""Utilidades para filas en Google Sheets (índice en columna A) sin depender de Streamlit."""
+"""
+LEGADO: índice numérico en columna A.
+
+Las hojas EDESUR e Intrant de este proyecto usan col A = fecha (DD/MM/YYYY texto).
+NO usar siguiente_indice_columna_a al escribir filas de monitoreo TV.
+Se mantiene solo por compatibilidad con scripts antiguos.
+"""
 from __future__ import annotations
 
 
 def titulo_hoja_desde_range_a1(range_a1: str) -> str:
     """
-    Obtiene el nombre de la pestaña desde 'Hoja 1!A:G' o 'Sheet1!A:F'.
+    Obtiene el nombre de la pestaña desde 'Hoja 1!A:H' o 'Sheet1!A:F'.
     Sin '!' asume primera hoja con nombre típico (compat).
     """
     s = (range_a1 or "").strip()
@@ -43,8 +49,8 @@ def parse_indice_columna_a(val) -> int | None:
 
 def siguiente_indice_columna_a(service_sheets_v4, spreadsheet_id: str, sheet_title: str) -> int:
     """
-    Lee la columna A de la pestaña y devuelve max(índices numéricos) + 1.
-    Ignora cabeceras, fechas mal colocadas en A, texto, etc.
+    LEGADO. Lee la columna A y devuelve max(índices numéricos) + 1.
+    No usar en hojas donde A = fecha (EDESUR / Intrant).
     """
     qs = "'" + sheet_title.replace("'", "''") + "'"
     rng = qs + "!A:A"

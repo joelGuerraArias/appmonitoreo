@@ -3547,7 +3547,7 @@ def cargar_telegram_config():
     """Carga configuración de Telegram"""
     default_config = {
         'enabled': True,  # Habilitado por defecto
-        'bot_token': '8017408973:AAGlIaN5mxOKilTmhEWtCcCBxbw-J69sLWk',  # Tu nuevo bot token
+        'bot_token': 'YOUR_TELEGRAM_BOT_TOKEN',  # Tu nuevo bot token
         'chat_id': '@edesuralertas',  # Tu canal de Telegram actualizado
         'send_clips': True,
         'send_summary': True,
@@ -4488,7 +4488,7 @@ TRANSCRIPCIÓN COMPLETA:
 {transcripcion_completa}
 
 ===============================================
-GENERADO POR: Video Analyzer IA v3.0
+GENERADO POR: Video Analyzer IA v4.0
 ===============================================
 """
             
@@ -5229,7 +5229,7 @@ def generar_md_sesion_coincidencias(
         # ============================
         md.append(f"# 🎯 Reporte de Sesión - Coincidencias Detectadas")
         md.append(f"")
-        md.append(f"> **Video Analyzer IA v3.0** | Sesión: {fecha_legible}")
+        md.append(f"> **Video Analyzer IA v4.0** | Sesión: {fecha_legible}")
         md.append(f"")
         md.append(f"---")
         md.append(f"")
@@ -5414,7 +5414,7 @@ def generar_md_sesion_coincidencias(
         # ============================
         # PIE
         # ============================
-        md.append(f"_Reporte generado automáticamente por Video Analyzer IA v3.0 - {fecha_legible}_")
+        md.append(f"_Reporte generado automáticamente por Video Analyzer IA v4.0 - {fecha_legible}_")
         
         # === ESCRIBIR ARCHIVO ===
         contenido_final = "\n".join(md)
@@ -6246,7 +6246,7 @@ def generar_html_resumen_diario(coincidencias, cliente_nombre, corte_label, fech
         <!-- Footer -->
         <div style="background: #343a40; color: white; padding: 20px; border-radius: 0 0 16px 16px; text-align: center;">
             <p style="margin: 4px 0; opacity: 0.8; font-size: 13px;">
-                🤖 Resumen generado automáticamente por Video Analyzer IA v3.0
+                🤖 Resumen generado automáticamente por Video Analyzer IA v4.0
             </p>
             <p style="margin: 4px 0; opacity: 0.6; font-size: 12px;">
                 {datetime.now().strftime('%d/%m/%Y %H:%M:%S')} &middot; {cliente_nombre}
@@ -7006,7 +7006,7 @@ def enviar_clips_a_telegram(clips_generados, resumen, terminos_detectados, video
 📋 *RESUMEN EJECUTIVO:*
 {resumen}
 
-🌐 *Servidor:* Analizador de Videos IA v3.0
+🌐 *Servidor:* Analizador de Videos IA v4.0
 
 ⬇️ *Videos a continuación...*"""
         
@@ -7123,7 +7123,7 @@ def test_telegram_connection():
 
 ✅ Bot conectado correctamente
 ⏰ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-🤖 Analizador de Videos IA v3.0
+🤖 Analizador de Videos IA v4.0
 
 Este es un mensaje de prueba."""
     
@@ -11126,6 +11126,424 @@ def crear_archivo_consolidado(video_path, nombre_video, coincidencias, transcrip
     
     return archivo_consolidado
 
+PROGRAMACION_TV_JSON = str(_DIR_SCRIPT / "programacion_tv.json")
+_programacion_tv_cache = None
+
+CANAL_ALIASES = {
+    "TELEANTILLAS": "Teleantillas",
+    "TELE ANTILLAS": "Teleantillas",
+    "TELE ANTILLA": "Teleantillas",
+    "TELEMICRO": "Telemicro",
+    "TELEMICRO CANAL 5": "Telemicro",
+    "ANTENA7": "Antena Latina",
+    "ANTENA 7": "Antena Latina",
+    "ANTENA LATINA": "Antena Latina",
+    "COLORVISION": "Color Vision",
+    "COLOR VISION": "Color Vision",
+    "TELESISTEMA": "Telesistema",
+    "TELESISTEMA 11": "Telesistema",
+    "TELECENTRO": "Telecentro",
+    "DIGITAL15": "Digital 15",
+    "DIGITAL 15": "Digital 15",
+    "CDN": "CDN",
+    "CDN37": "CDN",
+    "CDN 37": "CDN",
+    "CDN EN VIVO": "CDN",
+    "CDN EN VIVO 37": "CDN",
+    "TRA": "TRA",
+    "TELEUNIVERSO": "Teleuniverso",
+    "TELE UNIVERSO": "Teleuniverso",
+    "ACENTO": "Acento",
+    "ACENTO TV": "Acento",
+    "CINEVISION": "Cinevision",
+    "PANORAMA": "Panorama",
+    "TELE SISEMA": "Telesistema",
+    "TELEMEDIOS": "Telemedios",
+    "CANAL SEIS": "Canal Seis",
+    "EL SEIS": "Canal Seis",
+    "MICROVISION": "Microvision",
+    "RNN": "RNN",
+    "FGJ MEDIOS": "FGJ Medios",
+}
+
+
+def cargar_programacion_tv():
+    global _programacion_tv_cache
+    if _programacion_tv_cache is not None:
+        return _programacion_tv_cache
+    try:
+        if os.path.isfile(PROGRAMACION_TV_JSON):
+            with open(PROGRAMACION_TV_JSON, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                _programacion_tv_cache = data
+                return data
+    except Exception as e:
+        log_warning(f"No se pudo cargar programacion_tv.json: {e}", "cargar_programacion_tv")
+    _programacion_tv_cache = {}
+    return _programacion_tv_cache
+
+
+def _config_canal_programacion(canal):
+    prog = cargar_programacion_tv()
+    if not canal or not prog:
+        return None
+    if canal in prog:
+        return prog[canal]
+    canal_upper = canal.upper()
+    for k, v in prog.items():
+        if k.upper() == canal_upper:
+            return v
+    return None
+
+
+def normalizar_canal_programacion(canal_raw):
+    if not canal_raw:
+        return ""
+    s = str(canal_raw).replace("_", " ").strip()
+    s = re.sub(r"\s+", " ", s)
+    key = s.upper()
+    key_compact = key.replace(" ", "")
+    if key in CANAL_ALIASES:
+        return CANAL_ALIASES[key]
+    if key_compact in CANAL_ALIASES:
+        return CANAL_ALIASES[key_compact]
+    prog = cargar_programacion_tv()
+    for k in prog:
+        ku = k.upper()
+        if ku == key or ku.replace(" ", "") == key_compact:
+            return k
+    return s.title() if s else str(canal_raw)
+
+
+def metadata_emision_archivo(nombre_o_ruta):
+    """Extrae canal y datetime del nombre del archivo (p. ej. Acento_TV_2026-07-19_08-40-59.mp4)."""
+    base = os.path.basename(str(nombre_o_ruta or ""))
+    if base.lower().endswith(".mp4"):
+        base = base[:-4]
+    dt = None
+    canal_raw = ""
+    m = re.match(
+        r"^(?P<canal>.+?)_(?P<fecha>\d{4}-\d{2}-\d{2})_(?P<hora>\d{2}-\d{2}-\d{2})$",
+        base,
+        re.I,
+    )
+    if m:
+        canal_raw = m.group("canal")
+        try:
+            dt = datetime.strptime(
+                f"{m.group('fecha')} {m.group('hora').replace('-', ':')}",
+                "%Y-%m-%d %H:%M:%S",
+            )
+        except ValueError:
+            dt = None
+    if not dt:
+        m2 = re.match(
+            r"^(?P<canal>.+?)_(?P<fecha>\d{8})_(?P<hora>\d{6})$",
+            base,
+            re.I,
+        )
+        if m2:
+            canal_raw = m2.group("canal")
+            try:
+                dt = datetime.strptime(
+                    f"{m2.group('fecha')} {m2.group('hora')}",
+                    "%Y%m%d %H%M%S",
+                )
+            except ValueError:
+                dt = None
+    canal = normalizar_canal_programacion(canal_raw)
+    return {
+        "canal": canal,
+        "canal_raw": canal_raw,
+        "datetime": dt,
+        "basename": base + ".mp4" if base else "",
+    }
+
+
+def _dia_en_rango_escaneo(dt, modo_dias):
+    if not dt:
+        return False
+    wd = dt.weekday()
+    modo = (modo_dias or "").lower().replace("-", "_")
+    if modo in ("lunes_a_viernes", "lun_vie", "weekdays"):
+        return wd < 5
+    return True
+
+
+def _hora_en_slot(dt, slot):
+    if not dt or not slot:
+        return False
+    try:
+        hi = datetime.strptime(slot.get("inicio", "00:00"), "%H:%M").time()
+        hf = datetime.strptime(slot.get("fin", "23:59"), "%H:%M").time()
+    except ValueError:
+        return False
+    t = dt.time()
+    if hi <= hf:
+        return hi <= t < hf
+    return t >= hi or t < hf
+
+
+def obtener_horarios_escaneo_canal(canal):
+    cfg = _config_canal_programacion(canal) or {}
+    slots = cfg.get("escaneo_solo_horarios") or []
+    return slots if isinstance(slots, list) else []
+
+
+def video_pasa_filtro_escaneo_horario(nombre_o_ruta):
+    """
+    Filtro de escaneo por canal/horario (p. ej. Teleantillas solo mañana).
+    Retorna (ok: bool, motivo: str).
+
+    Reglas:
+    - Fin de semana (sáb/dom) → todos los videos, todos los canales.
+    - Canal SIN escaneo_solo_horarios en programacion_tv.json → todos los videos, todo el día.
+    - Canal CON escaneo_solo_horarios → solo los bloques definidos (lun–vie).
+    """
+    if datetime.now().weekday() >= 5:
+        return True, "fin de semana — sin filtro de horario"
+    meta = metadata_emision_archivo(nombre_o_ruta)
+    canal = meta.get("canal") or ""
+    slots = obtener_horarios_escaneo_canal(canal)
+    if not slots:
+        if canal:
+            return True, f"{canal} — sin horario de escaneo; se procesan todos los videos"
+        return True, "canal sin horario de escaneo; se procesan todos los videos"
+    canal_cfg = _config_canal_programacion(canal) or {}
+    dt = meta.get("datetime")
+    if not dt:
+        return False, f"Video fuera de horario — {canal}: sin fecha/hora en el nombre (no se procesa)"
+    modo_dias = canal_cfg.get("escaneo_solo_dias") or "lunes_a_viernes"
+    if not _dia_en_rango_escaneo(dt, modo_dias):
+        return False, f"Video fuera de horario — {canal} {dt.strftime('%H:%M')} (solo lun–vie)"
+    for slot in slots:
+        if _hora_en_slot(dt, slot):
+            prog = slot.get("programa") or ""
+            return True, f"horario OK — {slot.get('inicio')}-{slot.get('fin')} {prog}".strip()
+    lista = ", ".join(
+        f"{s.get('inicio', '?')}-{s.get('fin', '?')} {s.get('programa', '')}".strip()
+        for s in slots
+    )
+    hora_txt = dt.strftime("%H:%M")
+    return False, f"Video fuera de horario — {canal} {hora_txt} (permitidos: {lista})"
+
+
+def _es_carpeta_ignorada_escaneo(rel_root):
+    rel_root = (rel_root or ".").replace("\\", "/").lower()
+    if rel_root in ("videoscheck", "archivos_fallidos", "procesados"):
+        return True
+    parts = [p for p in rel_root.split("/") if p and p != "."]
+    if "videoscheck" in parts or "archivos_fallidos" in parts or "procesados" in parts:
+        return True
+    if rel_root.startswith("videoscheck/") or rel_root.startswith("archivos_fallidos/"):
+        return True
+    if rel_root.startswith("procesados/") or "/procesados/" in f"/{rel_root}/":
+        return True
+    return False
+
+
+def es_error_archivo_en_uso(texto_o_exc):
+    """True si el error indica que el archivo está bloqueado (p. ej. grabando)."""
+    if isinstance(texto_o_exc, PermissionError):
+        return True
+    if isinstance(texto_o_exc, OSError):
+        if getattr(texto_o_exc, "winerror", None) == 32:
+            return True
+        if getattr(texto_o_exc, "errno", None) in (13, 16):
+            txt_os = str(texto_o_exc).lower()
+            if any(x in txt_os for x in ("denied", "denegado", "being used", "en uso")):
+                return True
+    txt = str(texto_o_exc or "").lower()
+    markers = (
+        "being used by another process",
+        "used by another process",
+        "permission denied",
+        "acceso denegado",
+        "el proceso no tiene acceso",
+        "cannot access the file",
+        "sharing violation",
+        "winerror 32",
+        "error 32",
+        "archivo en uso",
+        "file is locked",
+    )
+    return any(m in txt for m in markers)
+
+
+def encolar_video_en_uso_fin_ciclo(archivo_path, rel, motivo, cola, mostrar_ui=True):
+    """Anota un video en uso para reprocesarlo al final del ciclo (sigue grabando)."""
+    if archivo_path and archivo_path not in cola:
+        cola.append(archivo_path)
+    msg = (
+        f"🔴 **En grabación / en uso:** `{rel}` — se reintentará al **final del ciclo**. "
+        f"({motivo})"
+    )
+    if mostrar_ui:
+        st.warning(msg)
+    log_info(f"Encolado fin de ciclo (en uso): {rel} — {motivo}", "encolar_video_en_uso_fin_ciclo")
+    ui_list = st.session_state.setdefault("videos_en_uso_fin_ciclo_ui", [])
+    ui_list.append(
+        {
+            "rel": rel,
+            "motivo": motivo,
+            "hora": datetime.now().isoformat(timespec="seconds"),
+        }
+    )
+    return True
+
+
+def mover_video_origen_a_carpeta_procesados(archivo_path, mostrar_ui=True):
+    """
+    Tras procesar un video, lo mueve a una subcarpeta `procesados` en el mismo directorio.
+    Ej.: .../Teleantillas/video.mp4 → .../Teleantillas/procesados/video.mp4
+    """
+    func_name = "mover_video_origen_a_carpeta_procesados"
+    try:
+        if not archivo_path or not os.path.isfile(archivo_path):
+            return False, "Archivo no existe o ya no está en origen"
+        parent = os.path.dirname(os.path.abspath(archivo_path))
+        if os.path.basename(parent).lower() == "procesados":
+            return True, archivo_path
+        dest_dir = os.path.join(parent, "procesados")
+        os.makedirs(dest_dir, exist_ok=True)
+        nombre = os.path.basename(archivo_path)
+        dest = os.path.join(dest_dir, nombre)
+        if os.path.abspath(archivo_path) == os.path.abspath(dest):
+            return True, dest
+        if os.path.exists(dest):
+            stem, ext = os.path.splitext(nombre)
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            dest = os.path.join(dest_dir, f"{stem}_{ts}{ext}")
+        shutil.move(archivo_path, dest)
+        rel_orig = os.path.relpath(archivo_path, CARPETA_VIDEOS)
+        rel_dest = os.path.relpath(dest, CARPETA_VIDEOS)
+        msg = f"📦 Movido a procesados/: `{rel_orig}` → `{rel_dest}`"
+        if mostrar_ui:
+            st.info(msg)
+        log_info(msg, func_name)
+        return True, dest
+    except Exception as e:
+        log_warning(f"No se pudo mover a procesados/: {archivo_path} — {e}", func_name)
+        if mostrar_ui:
+            st.warning(f"⚠️ No se pudo mover `{os.path.basename(str(archivo_path))}` a procesados/: {e}")
+        return False, str(e)
+
+
+def borrar_video_origen_permanente(archivo_path, motivo="", mostrar_ui=True, registrar=True):
+    """
+    Borra el video de origen de forma definitiva (os.remove — no pasa por la Papelera).
+    También elimina audios auxiliares del mismo nombre (.wav/.mp3/.m4a/.aac).
+    Solo permite borrar si el archivo está bajo CARPETA_VIDEOS.
+    """
+    func_name = "borrar_video_origen_permanente"
+    try:
+        if not archivo_path:
+            return False, "Sin ruta"
+        path = archivo_path
+        if not os.path.isabs(str(path)):
+            path = os.path.join(CARPETA_VIDEOS, str(path))
+        path = os.path.abspath(path)
+        raiz_permitida = os.path.abspath(CARPETA_VIDEOS)
+        if not path.startswith(raiz_permitida + os.sep) and path != raiz_permitida:
+            msg = f"Bloqueado: ruta fuera de videos procesados — {path}"
+            log_warning(msg, func_name)
+            if mostrar_ui:
+                st.error(f"🛑 {msg}")
+            return False, msg
+        if not os.path.isfile(path):
+            return False, "Archivo no encontrado"
+        rel = os.path.relpath(path, CARPETA_VIDEOS)
+        stem, _ext = os.path.splitext(path)
+        borrados = []
+        for candidato in [path] + [stem + ext for ext in (".wav", ".mp3", ".m4a", ".aac")]:
+            if os.path.isfile(candidato):
+                os.remove(candidato)
+                borrados.append(os.path.basename(candidato))
+        if registrar:
+            registrar_archivo_procesado(
+                os.path.basename(rel),
+                [],
+                f"Borrado permanente: {motivo or 'sin motivo'}",
+                "mp4",
+            )
+        msg_ui = f"🗑️ **Eliminado permanentemente:** `{rel}`"
+        if motivo:
+            msg_ui += f" — {motivo}"
+        if mostrar_ui:
+            st.warning(msg_ui)
+        ui_list = st.session_state.setdefault("videos_borrados_ui", [])
+        ui_list.append({"rel": rel, "motivo": motivo or "sin motivo", "hora": datetime.now().isoformat(timespec="seconds")})
+        log_info(f"Borrado permanente: {rel} — {motivo} — archivos: {borrados}", func_name)
+        return True, rel
+    except Exception as e:
+        log_warning(f"Error borrando {archivo_path}: {e}", func_name)
+        if mostrar_ui:
+            st.warning(f"⚠️ No se pudo borrar `{os.path.basename(str(archivo_path))}`: {e}")
+        return False, str(e)
+
+
+def eliminar_video_fuera_horario(archivo_path, motivo_horario, mostrar_ui=True):
+    """Borra un video fuera de horario y actualiza contadores de ciclo."""
+    ok, _msg = borrar_video_origen_permanente(
+        archivo_path,
+        motivo=f"fuera de horario — {motivo_horario}",
+        mostrar_ui=mostrar_ui,
+        registrar=True,
+    )
+    if ok:
+        st.session_state.ciclo_borrados_horario = int(st.session_state.get("ciclo_borrados_horario") or 0) + 1
+    return ok
+
+
+def _video_tuvo_tangenciales(rel, menciones_tangenciales_data):
+    rel_norm = (rel or "").replace("\\", "/")
+    base = os.path.basename(rel_norm)
+    for t in menciones_tangenciales_data or []:
+        ar = (t.get("archivo") or "").replace("\\", "/")
+        if ar == rel_norm or os.path.basename(ar) == base:
+            return True
+    return False
+
+
+def post_procesar_video_origen(archivo_path, rel, coincidencias_items, menciones_tangenciales_data, mostrar_ui=True):
+    """Tras analizar: mover a procesados/ si hubo coincidencias o tangenciales; si no, borrar."""
+    tiene_coinc = bool(coincidencias_items)
+    tiene_tang = _video_tuvo_tangenciales(rel, menciones_tangenciales_data)
+    if tiene_coinc or tiene_tang:
+        ok, _msg = mover_video_origen_a_carpeta_procesados(archivo_path, mostrar_ui=mostrar_ui)
+        if ok:
+            st.session_state.ciclo_movidos_procesados = int(st.session_state.get("ciclo_movidos_procesados") or 0) + 1
+        return ok
+    ok, _msg = borrar_video_origen_permanente(
+        archivo_path,
+        motivo="sin coincidencias ni tangenciales",
+        mostrar_ui=mostrar_ui,
+        registrar=True,
+    )
+    if ok:
+        st.session_state.ciclo_borrados_sin_match = int(st.session_state.get("ciclo_borrados_sin_match") or 0) + 1
+    return ok
+
+
+def _mostrar_resumen_borrados_ciclo():
+    n_h = int(st.session_state.get("ciclo_borrados_horario") or 0)
+    n_s = int(st.session_state.get("ciclo_borrados_sin_match") or 0)
+    n_m = int(st.session_state.get("ciclo_movidos_procesados") or 0)
+    n_u = len(st.session_state.get("videos_en_uso_fin_ciclo_ui") or [])
+    if not (n_h or n_s or n_m or n_u):
+        return
+    st.markdown("### 🧹 Resumen de limpieza del ciclo")
+    if n_h:
+        st.info(f"🗑️ **{n_h}** video(s) eliminados por estar **fuera de horario**")
+    if n_s:
+        st.info(f"🗑️ **{n_s}** video(s) eliminados **sin coincidencias ni tangenciales**")
+    if n_m:
+        st.info(f"📦 **{n_m}** video(s) movidos a **`procesados/`**")
+    if n_u:
+        st.warning(f"🔴 **{n_u}** video(s) detectados **en grabación / en uso** (reintentados al final del ciclo)")
+
+
 def registrar_archivo_procesado(nombre_archivo, coincidencias, resumen, tipo_archivo, video_url=None):
     """
     Registra un archivo procesado en AMBOS archivos:
@@ -11206,9 +11624,7 @@ def buscar_videos_nuevos_optimizado(procesados, func_name):
         # Escanear carpetas de forma optimizada
         for root, dirs, files in os.walk(CARPETA_VIDEOS):
             rel_root = os.path.relpath(root, CARPETA_VIDEOS).replace("\\", "/").lower()
-            if rel_root == "videoscheck" or rel_root.startswith("videoscheck/"):
-                continue
-            if rel_root == "archivos_fallidos" or rel_root.startswith("archivos_fallidos/"):
+            if _es_carpeta_ignorada_escaneo(rel_root):
                 continue
             # OPTIMIZACIÓN 1: Ignorar carpetas con clips generados
             marcador_procesado = os.path.join(root, "PROCESADO.txt")
@@ -11347,6 +11763,20 @@ def buscar_videos_nuevos_optimizado(procesados, func_name):
                             }
                             log_debug(f"Omitido (fallidos): {rel_path}", func_name)
                             continue
+
+                        ok_horario, motivo_horario = video_pasa_filtro_escaneo_horario(path_full)
+                        if not ok_horario:
+                            eliminar_video_fuera_horario(path_full, motivo_horario, mostrar_ui=False)
+                            file_stat = os.stat(path_full) if os.path.exists(path_full) else None
+                            archivos_cache[path_full] = {
+                                'mtime': file_stat.st_mtime if file_stat else 0,
+                                'size': file_size,
+                                'procesado': False,
+                                'omitido_horario': True,
+                                'motivo_omitido': motivo_horario,
+                            }
+                            log_info(f"⏭️ Video fuera de horario (eliminado): {rel_path} — {motivo_horario}", func_name)
+                            continue
                         
                         # OPTIMIZACIÓN 6: Verificar fecha del archivo (SOLO para caché, no para filtrar)
                         file_stat = os.stat(path_full)
@@ -11415,9 +11845,7 @@ def buscar_videos_tradicional(procesados, func_name):
     
     for root, _, files in os.walk(CARPETA_VIDEOS):
         rel_root = os.path.relpath(root, CARPETA_VIDEOS).replace("\\", "/").lower()
-        if rel_root == "videoscheck" or rel_root.startswith("videoscheck/"):
-            continue
-        if rel_root == "archivos_fallidos" or rel_root.startswith("archivos_fallidos/"):
+        if _es_carpeta_ignorada_escaneo(rel_root):
             continue
         # IGNORAR carpetas que contienen clips generados
         marcador_procesado = os.path.join(root, "PROCESADO.txt")
@@ -11473,6 +11901,10 @@ def buscar_videos_tradicional(procesados, func_name):
         if es_archivo_fallido(rel_path) or es_archivo_fallido(nombre_archivo_solo):
             continue
         if rel_path not in procesados and nombre_archivo_solo not in procesados:
+            ok_horario, motivo_horario = video_pasa_filtro_escaneo_horario(f)
+            if not ok_horario:
+                eliminar_video_fuera_horario(f, motivo_horario, mostrar_ui=False)
+                continue
             nuevos.append(f)
         else:
             archivos_ya_procesados.append(f)
@@ -11518,6 +11950,8 @@ def escanear_carpeta_completa():
     archivos_procesados = 0
     archivos_nuevos = 0
     archivos_muy_pequeños = 0
+    archivos_fuera_horario = 0
+    archivos_fuera_horario_lista = []
     
     # Cargar lista de archivos ya procesados
     procesados = cargar_procesados()
@@ -11532,9 +11966,7 @@ def escanear_carpeta_completa():
         # Escanear toda la carpeta
         for root, dirs, files in os.walk(CARPETA_VIDEOS):
             rel_root = os.path.relpath(root, CARPETA_VIDEOS).replace("\\", "/").lower()
-            if rel_root == "videoscheck" or rel_root.startswith("videoscheck/"):
-                continue
-            if rel_root == "archivos_fallidos" or rel_root.startswith("archivos_fallidos/"):
+            if _es_carpeta_ignorada_escaneo(rel_root):
                 continue
             # Ignorar carpetas con clips generados
             marcador_procesado = os.path.join(root, "PROCESADO.txt")
@@ -11593,7 +12025,13 @@ def escanear_carpeta_completa():
                     elif es_archivo_fallido(rel_path) or es_archivo_fallido(nombre_archivo_solo):
                         pass
                     else:
-                        archivos_nuevos += 1
+                        ok_horario, motivo_horario = video_pasa_filtro_escaneo_horario(path_full)
+                        if ok_horario:
+                            archivos_nuevos += 1
+                        else:
+                            archivos_fuera_horario += 1
+                            archivos_fuera_horario_lista.append((rel_path, motivo_horario))
+                            eliminar_video_fuera_horario(path_full, motivo_horario, mostrar_ui=False)
                     
                     # Actualizar progreso cada 10 archivos
                     if total_archivos % 10 == 0:
@@ -11659,9 +12097,7 @@ def escanear_carpeta_completa():
                 archivos_procesados_lista = []
                 for root, dirs, files in os.walk(CARPETA_VIDEOS):
                     rel_root = os.path.relpath(root, CARPETA_VIDEOS).replace("\\", "/").lower()
-                    if rel_root == "videoscheck" or rel_root.startswith("videoscheck/"):
-                        continue
-                    if rel_root == "archivos_fallidos" or rel_root.startswith("archivos_fallidos/"):
+                    if _es_carpeta_ignorada_escaneo(rel_root):
                         continue
                     marcador_procesado = os.path.join(root, "PROCESADO.txt")
                     if os.path.exists(marcador_procesado):
@@ -11708,9 +12144,7 @@ def escanear_carpeta_completa():
         archivos_muy_pequenos_lista = []
         for root, dirs, files in os.walk(CARPETA_VIDEOS):
             rel_root = os.path.relpath(root, CARPETA_VIDEOS).replace("\\", "/").lower()
-            if rel_root == "videoscheck" or rel_root.startswith("videoscheck/"):
-                continue
-            if rel_root == "archivos_fallidos" or rel_root.startswith("archivos_fallidos/"):
+            if _es_carpeta_ignorada_escaneo(rel_root):
                 continue
             marcador_procesado = os.path.join(root, "PROCESADO.txt")
             if os.path.exists(marcador_procesado):
@@ -11752,7 +12186,9 @@ def escanear_carpeta_completa():
                             and not es_archivo_fallido(rel_path)
                             and not es_archivo_fallido(nombre_archivo_solo)
                         ):
-                            archivos_nuevos_lista.append(rel_path)
+                            ok_horario, _motivo_h = video_pasa_filtro_escaneo_horario(path_full)
+                            if ok_horario:
+                                archivos_nuevos_lista.append(rel_path)
                         elif file_size < TAMANO_MINIMO_BYTES:
                             archivos_muy_pequenos_lista.append(rel_path)
                     except Exception:
@@ -11798,6 +12234,8 @@ def escanear_carpeta_completa():
             'archivos_nuevos': archivos_nuevos,
             'archivos_muy_pequeños': archivos_muy_pequeños,
             'archivos_muy_pequeños_lista': archivos_muy_pequenos_lista,
+            'archivos_fuera_horario': archivos_fuera_horario,
+            'archivos_fuera_horario_lista': archivos_fuera_horario_lista,
             'procesados': procesados,
             'archivos_nuevos_lista': archivos_nuevos_lista
         }
@@ -11851,6 +12289,13 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
     # Marcar que el procesamiento está en curso
     st.session_state.procesamiento_en_curso = True
     log_info("🔒 Marcando procesamiento como en curso para evitar duplicados", func_name)
+
+    # Contadores de borrados/movimientos/en-uso de este ciclo (para resumen UI)
+    st.session_state.ciclo_borrados_horario = 0
+    st.session_state.ciclo_borrados_sin_match = 0
+    st.session_state.ciclo_movidos_procesados = 0
+    st.session_state.videos_borrados_ui = []
+    st.session_state.videos_en_uso_fin_ciclo_ui = []
     
     # Limpiar control de duplicados de Supabase para nuevo procesamiento
     st.session_state.coincidencias_enviadas_supabase.clear()
@@ -11993,6 +12438,11 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
         log_info(f"Fallback tradicional tras desincronización: {len(nuevos)} archivos", func_name)
     
     if not nuevos:
+        _mostrar_resumen_borrados_ciclo()
+        n_bh = int(st.session_state.get("ciclo_borrados_horario") or 0)
+        n_sm = int(st.session_state.get("ciclo_borrados_sin_match") or 0)
+        if n_bh or n_sm:
+            st.info(f"🧹 Ciclo sin videos nuevos: {n_bh} borrados por horario, {n_sm} borrados sin match.")
         st.info("✅ No hay videos nuevos para procesar después del escaneo")
         st.session_state.procesamiento_en_curso = False
         return
@@ -12018,1248 +12468,1313 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
     
     # FASE 1: PROCESAR TODOS LOS VIDEOS PRIMERO (sin enviar webhooks)
     st.info("🎬 FASE 1: Procesando todos los videos (sin envíos)")
-    
-    for i, archivo_path in enumerate(nuevos):
-        rel = os.path.relpath(archivo_path, CARPETA_VIDEOS)
-        
-        # BLOQUE TRY-EXCEPT GENERAL PARA CADA ARCHIVO
-        try:
-            # Detectar tipo de archivo (solo videos)
-            es_video = archivo_path.lower().endswith('.mp4')
-            
-            # Icono para videos
-            icono = "🎞️"
-            tipo_archivo = "Video"
-            
-            with current_video_container.container():
-                st.info(f"**{i+1}/{len(nuevos)}** — {icono} Procesando: `{rel}`")
-                st.markdown(f"### {icono} Procesando {tipo_archivo} ({i+1}/{len(nuevos)}): `{rel}`")
-                progress_bar = st.progress(0, text=f"Iniciando... ({i+1}/{len(nuevos)})")
-            
-            # Configurar rutas para videos MP4
-            audio_path = archivo_path.replace(".mp4", ".wav")
-            md_path = archivo_path.replace(".mp4", "_streaming.md")
-            
-            dur_total = obtener_duracion(archivo_path)
+    cola_en_uso = []
 
-            # === FILTRO opcional por duración (VIDEO_DURACION_MINIMA_SEGUNDOS; 0 = desactivado) ===
-            if DURACION_MINIMA_SEGUNDOS_PROCESAR > 0 and dur_total is not None:
-                if dur_total < DURACION_MINIMA_SEGUNDOS_PROCESAR:
-                    minutos = int(dur_total // 60)
-                    segundos = int(dur_total % 60)
-                    req_m = DURACION_MINIMA_SEGUNDOS_PROCESAR // 60
-                    req_s = DURACION_MINIMA_SEGUNDOS_PROCESAR % 60
-                    msg = (
-                        f"⏭️ **SALTANDO video corto:** `{rel}` — Duración: {minutos}:{segundos:02d} "
-                        f"(mínimo configurado: {req_m}:{req_s:02d}). "
-                        f"Para analizar todos los videos: `VIDEO_DURACION_MINIMA_SEGUNDOS=0` en `.env`."
-                    )
-                    st.warning(msg)
-                    log_info(
-                        f"Video saltado por duración ({dur_total:.0f}s < {DURACION_MINIMA_SEGUNDOS_PROCESAR}s): {rel}",
-                        func_name,
-                    )
-                    registrar_archivo_procesado(
-                        os.path.basename(archivo_path),
-                        [],
-                        f"Video saltado: duración menor a {DURACION_MINIMA_SEGUNDOS_PROCESAR}s",
-                        "mp4",
-                    )
-                    st.session_state.videos_procesados += 1
+    for pasada in ("inicial", "reintento"):
+        if pasada == "reintento":
+            if not cola_en_uso:
+                break
+            st.info(
+                f"🔁 **Reintento fin de ciclo:** {len(cola_en_uso)} video(s) que estaban "
+                f"**en grabación / en uso** — probablemente ya terminaron de grabarse."
+            )
+            batch_videos = list(cola_en_uso)
+            cola_en_uso = []
+        else:
+            batch_videos = nuevos
+
+        for i, archivo_path in enumerate(batch_videos):
+            rel = os.path.relpath(archivo_path, CARPETA_VIDEOS)
+            total_pasada = len(batch_videos)
+            etiqueta_pasada = " (reintento)" if pasada == "reintento" else ""
+        
+            # BLOQUE TRY-EXCEPT GENERAL PARA CADA ARCHIVO
+            try:
+                ok_horario_loop, motivo_horario_loop = video_pasa_filtro_escaneo_horario(archivo_path)
+                if not ok_horario_loop:
+                    eliminar_video_fuera_horario(archivo_path, motivo_horario_loop)
                     continue
-            elif dur_total is None:
-                st.warning(
-                    f"⚠️ No se pudo leer la duración con ffprobe: `{rel}`. "
-                    "Se continúa el análisis. Si **ffmpeg** no está instalado, añade su carpeta `bin` al PATH o define "
-                    "**FFMPEG_BIN** o **FFPROBE_PATH** en `.env`. Si el archivo es un segmento `.mp4` incompleto o dañado, "
-                    "ffprobe también fallará (revisa el log `debug_*.log`)."
-                )
-                log_warning(f"duración desconocida (ffprobe), se analiza igual: {rel}", func_name)
 
-            # Extraer/convertir audio según el tipo de archivo
-            progress_bar.progress(20, text="🎧 Procesando audio...")
-        
-            # Función para procesar audio con reintentos (solo videos)
-            def procesar_audio_con_reintentos(archivo_path, audio_path, max_reintentos=3):
-                for intento in range(max_reintentos):
-                    try:
-                        # Verificar que el archivo existe y es accesible
-                        if not os.path.exists(archivo_path):
-                            if intento < max_reintentos - 1:
-                                _ui_transient("warning", f"⚠️ Archivo no encontrado (intento {intento + 1}/{max_reintentos}): {archivo_path}")
-                                time.sleep(5)  # Esperar 5 segundos antes del siguiente intento
-                                continue
-                            else:
-                                _ui_transient("error", f"❌ Archivo no encontrado después de {max_reintentos} intentos: {archivo_path}")
-                                return False
-                    
-                        # Verificar tamaño del archivo
-                        file_size = os.path.getsize(archivo_path)
-                        if file_size == 0:
-                            if intento < max_reintentos - 1:
-                                _ui_transient("warning", f"⚠️ Archivo vacío (intento {intento + 1}/{max_reintentos}): {archivo_path}")
-                                time.sleep(5)  # Esperar 5 segundos antes del siguiente intento
-                                continue
-                            else:
-                                _ui_transient("error", f"❌ Archivo vacío después de {max_reintentos} intentos: {archivo_path}")
-                                return False
-                    
-                        # Extraer audio del video MP4
-                        _ffm = _ruta_ejecutable_ffmpeg()
-                        if not _ffm:
-                            _ui_transient(
-                                "error",
-                                "❌ ffmpeg no encontrado. Revisa FFMPEG_BIN / PATH en .env o instala FFmpeg.",
-                            )
-                            return False
-                        cmd = [
-                            _ffm,
-                            "-y",
-                            "-i",
-                            archivo_path,
-                            "-ac",
-                            "1",
-                            "-ar",
-                            "16000",
-                            "-f",
-                            "wav",
-                            audio_path,
-                        ]
-                        result = subprocess.run(
-                            cmd, capture_output=True, text=True, **_subprocess_no_window_kw()
+                # Detectar tipo de archivo (solo videos)
+                es_video = archivo_path.lower().endswith('.mp4')
+            
+                # Icono para videos
+                icono = "🎞️"
+                tipo_archivo = "Video"
+            
+                with current_video_container.container():
+                    st.info(f"**{i+1}/{total_pasada}**{etiqueta_pasada} — {icono} Procesando: `{rel}`")
+                    st.markdown(f"### {icono} Procesando {tipo_archivo} ({i+1}/{total_pasada}){etiqueta_pasada}: `{rel}`")
+                    progress_bar = st.progress(0, text=f"Iniciando... ({i+1}/{total_pasada})")
+            
+                # Configurar rutas para videos MP4
+                audio_path = archivo_path.replace(".mp4", ".wav")
+                md_path = archivo_path.replace(".mp4", "_streaming.md")
+            
+                dur_total = obtener_duracion(archivo_path)
+
+                # === FILTRO opcional por duración (VIDEO_DURACION_MINIMA_SEGUNDOS; 0 = desactivado) ===
+                if DURACION_MINIMA_SEGUNDOS_PROCESAR > 0 and dur_total is not None:
+                    if dur_total < DURACION_MINIMA_SEGUNDOS_PROCESAR:
+                        minutos = int(dur_total // 60)
+                        segundos = int(dur_total % 60)
+                        req_m = DURACION_MINIMA_SEGUNDOS_PROCESAR // 60
+                        req_s = DURACION_MINIMA_SEGUNDOS_PROCESAR % 60
+                        msg = (
+                            f"⏭️ **SALTANDO video corto:** `{rel}` — Duración: {minutos}:{segundos:02d} "
+                            f"(mínimo configurado: {req_m}:{req_s:02d}). "
+                            f"Para analizar todos los videos: `VIDEO_DURACION_MINIMA_SEGUNDOS=0` en `.env`."
                         )
+                        st.warning(msg)
+                        log_info(
+                            f"Video saltado por duración ({dur_total:.0f}s < {DURACION_MINIMA_SEGUNDOS_PROCESAR}s): {rel}",
+                            func_name,
+                        )
+                        registrar_archivo_procesado(
+                            os.path.basename(archivo_path),
+                            [],
+                            f"Video saltado: duración menor a {DURACION_MINIMA_SEGUNDOS_PROCESAR}s",
+                            "mp4",
+                        )
+                        st.session_state.videos_procesados += 1
+                        continue
+                elif dur_total is None:
+                    st.warning(
+                        f"⚠️ No se pudo leer la duración con ffprobe: `{rel}`. "
+                        "Se continúa el análisis. Si **ffmpeg** no está instalado, añade su carpeta `bin` al PATH o define "
+                        "**FFMPEG_BIN** o **FFPROBE_PATH** en `.env`. Si el archivo es un segmento `.mp4` incompleto o dañado, "
+                        "ffprobe también fallará (revisa el log `debug_*.log`)."
+                    )
+                    log_warning(f"duración desconocida (ffprobe), se analiza igual: {rel}", func_name)
+
+                # Extraer/convertir audio según el tipo de archivo
+                progress_bar.progress(20, text="🎧 Procesando audio...")
+        
+                # Función para procesar audio con reintentos (solo videos)
+                def procesar_audio_con_reintentos(archivo_path, audio_path, max_reintentos=3):
+                    for intento in range(max_reintentos):
+                        try:
+                            # Verificar que el archivo existe y es accesible
+                            if not os.path.exists(archivo_path):
+                                if intento < max_reintentos - 1:
+                                    _ui_transient("warning", f"⚠️ Archivo no encontrado (intento {intento + 1}/{max_reintentos}): {archivo_path}")
+                                    time.sleep(5)  # Esperar 5 segundos antes del siguiente intento
+                                    continue
+                                else:
+                                    _ui_transient("error", f"❌ Archivo no encontrado después de {max_reintentos} intentos: {archivo_path}")
+                                    return False
                     
-                        if result.returncode != 0:
+                            # Verificar acceso al archivo (detectar grabación en curso)
+                            try:
+                                with open(archivo_path, "rb") as _probe:
+                                    _probe.read(4096)
+                            except Exception as e_open:
+                                if es_error_archivo_en_uso(e_open):
+                                    return "en_uso"
+                                if intento < max_reintentos - 1:
+                                    time.sleep(5)
+                                    continue
+                                return False
+
+                            # Verificar tamaño del archivo
+                            file_size = os.path.getsize(archivo_path)
+                            if file_size == 0:
+                                if intento < max_reintentos - 1:
+                                    _ui_transient("warning", f"⚠️ Archivo vacío (intento {intento + 1}/{max_reintentos}): {archivo_path}")
+                                    time.sleep(5)  # Esperar 5 segundos antes del siguiente intento
+                                    continue
+                                else:
+                                    _ui_transient("error", f"❌ Archivo vacío después de {max_reintentos} intentos: {archivo_path}")
+                                    return False
+                    
+                            # Extraer audio del video MP4
+                            _ffm = _ruta_ejecutable_ffmpeg()
+                            if not _ffm:
+                                _ui_transient(
+                                    "error",
+                                    "❌ ffmpeg no encontrado. Revisa FFMPEG_BIN / PATH en .env o instala FFmpeg.",
+                                )
+                                return False
+                            cmd = [
+                                _ffm,
+                                "-y",
+                                "-i",
+                                archivo_path,
+                                "-ac",
+                                "1",
+                                "-ar",
+                                "16000",
+                                "-f",
+                                "wav",
+                                audio_path,
+                            ]
+                            result = subprocess.run(
+                                cmd, capture_output=True, text=True, **_subprocess_no_window_kw()
+                            )
+                    
+                            if result.returncode != 0:
+                                stderr_txt = f"{result.stderr or ''}\n{result.stdout or ''}"
+                                if es_error_archivo_en_uso(stderr_txt):
+                                    return "en_uso"
+                                if intento < max_reintentos - 1:
+                                    # Solo mostrar un mensaje breve en el primer intento
+                                    if intento == 0:
+                                        _ui_transient("warning", f"⚠️ Error procesando: {os.path.basename(archivo_path)} - reintentando...")
+                                    time.sleep(10)  # Esperar 10 segundos antes del siguiente intento
+                                    continue
+                                else:
+                                    # Solo mostrar un resumen final en una línea
+                                    _ui_transient("error", f"❌ No se pudo procesar: {os.path.basename(archivo_path)} - Error FFmpeg: {result.returncode}")
+                            
+                                    # Intentar con parámetros más permisivos
+                                    _ui_transient("info", "🔄 Intentando con parámetros alternativos...")
+                                    cmd_alt = [
+                                        _ffm,
+                                        "-y",
+                                        "-i",
+                                        archivo_path,
+                                        "-ac",
+                                        "1",
+                                        "-ar",
+                                        "16000",
+                                        "-f",
+                                        "wav",
+                                        "-avoid_negative_ts",
+                                        "make_zero",
+                                        audio_path,
+                                    ]
+                                    result_alt = subprocess.run(
+                                        cmd_alt,
+                                        capture_output=True,
+                                        text=True,
+                                        **_subprocess_no_window_kw(),
+                                    )
+                            
+                                    if result_alt.returncode != 0:
+                                        stderr_alt = f"{result_alt.stderr or ''}\n{result_alt.stdout or ''}"
+                                        if es_error_archivo_en_uso(stderr_alt):
+                                            return "en_uso"
+                                        _ui_transient("error", "❌ Error persistente incluso con parámetros alternativos")
+                                        return False
+                                    else:
+                                        _ui_transient("success", "✅ Audio extraído con parámetros alternativos")
+                                        return True
+                            else:
+                                _ui_transient("success", "✅ Audio extraído exitosamente")
+                                return True
+                    
+                        except Exception as e:
+                            if es_error_archivo_en_uso(e):
+                                return "en_uso"
                             if intento < max_reintentos - 1:
-                                # Solo mostrar un mensaje breve en el primer intento
                                 if intento == 0:
                                     _ui_transient("warning", f"⚠️ Error procesando: {os.path.basename(archivo_path)} - reintentando...")
-                                time.sleep(10)  # Esperar 10 segundos antes del siguiente intento
+                                time.sleep(5)  # Esperar 5 segundos antes del siguiente intento
                                 continue
                             else:
-                                # Solo mostrar un resumen final en una línea
-                                _ui_transient("error", f"❌ No se pudo procesar: {os.path.basename(archivo_path)} - Error FFmpeg: {result.returncode}")
-                            
-                                # Intentar con parámetros más permisivos
-                                _ui_transient("info", "🔄 Intentando con parámetros alternativos...")
-                                cmd_alt = [
-                                    _ffm,
-                                    "-y",
-                                    "-i",
-                                    archivo_path,
-                                    "-ac",
-                                    "1",
-                                    "-ar",
-                                    "16000",
-                                    "-f",
-                                    "wav",
-                                    "-avoid_negative_ts",
-                                    "make_zero",
-                                    audio_path,
-                                ]
-                                result_alt = subprocess.run(
-                                    cmd_alt,
-                                    capture_output=True,
-                                    text=True,
-                                    **_subprocess_no_window_kw(),
-                                )
-                            
-                                if result_alt.returncode != 0:
-                                    _ui_transient("error", "❌ Error persistente incluso con parámetros alternativos")
-                                    return False
-                                else:
-                                    _ui_transient("success", "✅ Audio extraído con parámetros alternativos")
-                                    return True
-                        else:
-                            _ui_transient("success", "✅ Audio extraído exitosamente")
-                            return True
-                    
-                    except Exception as e:
-                        if intento < max_reintentos - 1:
-                            if intento == 0:
-                                _ui_transient("warning", f"⚠️ Error procesando: {os.path.basename(archivo_path)} - reintentando...")
-                            time.sleep(5)  # Esperar 5 segundos antes del siguiente intento
-                            continue
-                        else:
-                            _ui_transient("error", f"❌ Error inesperado: {os.path.basename(archivo_path)} - {str(e)[:50]}...")
-                            return False
+                                _ui_transient("error", f"❌ Error inesperado: {os.path.basename(archivo_path)} - {str(e)[:50]}...")
+                                return False
             
-                return False
+                    return False
         
-            # Ejecutar procesamiento con reintentos
-            if not procesar_audio_con_reintentos(archivo_path, audio_path):
-                _ui_transient("warning", f"⚠️ Saltando: {os.path.basename(archivo_path)}")
-                continue
+                # Ejecutar procesamiento con reintentos
+                resultado_audio = procesar_audio_con_reintentos(archivo_path, audio_path)
+                if resultado_audio == "en_uso":
+                    encolar_video_en_uso_fin_ciclo(
+                        archivo_path,
+                        rel,
+                        "archivo en uso — probablemente aún grabando",
+                        cola_en_uso,
+                    )
+                    continue
+                if not resultado_audio:
+                    _ui_transient("warning", f"⚠️ Saltando: {os.path.basename(archivo_path)}")
+                    continue
 
-            # Transcribir (faster GPU → faster CPU → Mistral → OpenAI)
-            progress_bar.progress(40, text=f"🧠 Transcribiendo ({i+1}/{len(nuevos)})...")
-            start = time.time()
-            try:
-                transcripcion_mistral, api_usada, segments_timestamps = transcribir_audio_hibrido(
-                    audio_path, indice_actual=i+1, total=len(nuevos)
-                )
-                if not mostrar_solo_relevantes:
-                    st.info(f"🎯 Transcripción completada con {api_usada} — **{i+1}/{len(nuevos)}**")
-            except Exception as e:
-                _ui_transient("error", f"❌ Error en transcripción: {e}")
-                continue
-            elapsed_mistral = time.time() - start
-
-            # Timestamps: si ya los tenemos (faster/Mistral), usar; si no (OpenAI), obtener con whisper
-            if segments_timestamps is None or len(segments_timestamps) == 0:
-                progress_bar.progress(55, text="🕐 Obteniendo timestamps (OpenAI no los incluye)...")
+                # Transcribir (faster GPU → faster CPU → Mistral → OpenAI)
+                progress_bar.progress(40, text=f"🧠 Transcribiendo ({i+1}/{total_pasada})...")
                 start = time.time()
                 try:
-                    segments_timestamps = obtener_timestamps_whisper(audio_path)
-                except Exception as e:
-                    _ui_transient("error", f"❌ Error obteniendo timestamps: {e}")
-                    continue
-                elapsed_whisper = time.time() - start
-            else:
-                if not mostrar_solo_relevantes:
-                    st.success(f"✅ Timestamps incluidos en la transcripción — sin paso adicional")
-
-            progress_bar.progress(80, text="🔍 Buscando coincidencias...")
-        
-            coincidencias_md = []
-            coincidencias_items = []
-            # Crear carpeta principal del archivo (una sola vez)
-            archivo_name_clean = os.path.splitext(rel)[0]  # Sin extensión
-            archivo_name_safe = "".join(c for c in archivo_name_clean if c.isalnum() or c in (' ', '-', '_')).rstrip()
-            archivo_name_safe = archivo_name_safe.replace(' ', '_')[:50]  # Máximo 50 caracteres
-            fecha_folder = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
-            # CARPETA PRINCIPAL DEL ARCHIVO (contiene todos los clips) - EN CARPETA PROCESADOS
-            archivo_main_dir = os.path.join(CARPETA_PROCESADOS, f"c_{archivo_name_safe}_{fecha_folder}")
-            os.makedirs(archivo_main_dir, exist_ok=True)
-            log_info(f"Carpeta de coincidencias creada: {archivo_main_dir}", func_name)
-        
-            # Crear archivo marcador P* en la carpeta principal
-            marcador_path = os.path.join(archivo_main_dir, "PROCESADO.txt")
-            if not os.path.exists(marcador_path):
-                # Extraer nombres de términos (soporta dict y string)
-                terminos_nombres = [t.get('termino', str(t)) if isinstance(t, dict) else str(t) for t in terminos]
-                with open(marcador_path, "w", encoding="utf-8") as f:
-                    f.write(f"🚫 CARPETA PROCESADA - NO REPROCESAR\n")
-                    f.write(f"Fecha creación: {datetime.now().isoformat()}\n")
-                    f.write(f"Archivo origen: {rel} ({tipo_archivo})\n")
-                    f.write(f"Términos encontrados: {', '.join(terminos_nombres)}\n")
-                    f.write(f"Generado por: Video Analyzer IA v3.0\n")
-            
-            # ========== GUARDAR TRANSCRIPCIÓN COMPLETA DEL VIDEO ==========
-            transcripcion_completa_path = os.path.join(archivo_main_dir, "TRANSCRIPCION_COMPLETA.txt")
-            if not os.path.exists(transcripcion_completa_path):
-                try:
-                    # Extraer nombres de términos (soporta dict y string)
-                    terminos_nombres_transcripcion = [t.get('termino', str(t)) if isinstance(t, dict) else str(t) for t in terminos]
-                    with open(transcripcion_completa_path, "w", encoding="utf-8") as f:
-                        f.write(f"📝 TRANSCRIPCIÓN COMPLETA DEL VIDEO\n")
-                        f.write(f"{'='*80}\n\n")
-                        f.write(f"📹 VIDEO: {rel}\n")
-                        f.write(f"📅 FECHA DE ANÁLISIS: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-                        f.write(f"🧠 MOTOR DE TRANSCRIPCIÓN: {api_usada}\n")
-                        if dur_total is not None:
-                            f.write(
-                                f"⏱️ DURACIÓN TOTAL: {dur_total:.1f} segundos "
-                                f"({int(dur_total // 60)}:{int(dur_total % 60):02d})\n"
-                            )
-                        else:
-                            f.write("⏱️ DURACIÓN TOTAL: no disponible (ffprobe no devolvió duración)\n")
-                        f.write(f"🔍 TÉRMINOS BUSCADOS: {', '.join(terminos_nombres_transcripcion)}\n")
-                        f.write(f"\n{'='*80}\n")
-                        f.write(f"TRANSCRIPCIÓN:\n")
-                        f.write(f"{'='*80}\n\n")
-                        f.write(transcripcion_mistral)
-                        f.write(f"\n\n{'='*80}\n")
-                        f.write(f"📊 ESTADÍSTICAS:\n")
-                        f.write(f"- Total de palabras: {len(transcripcion_mistral.split())}\n")
-                        f.write(f"- Total de caracteres: {len(transcripcion_mistral)}\n")
-                        f.write(f"\n{'='*80}\n")
-                        f.write(f"✅ Generado automáticamente por Video Analyzer IA v3.0\n")
-                    
-                    log_info(f"✅ Transcripción completa guardada: {transcripcion_completa_path}", func_name)
+                    transcripcion_mistral, api_usada, segments_timestamps = transcribir_audio_hibrido(
+                        audio_path, indice_actual=i+1, total=total_pasada
+                    )
                     if not mostrar_solo_relevantes:
-                        st.info(f"💾 Transcripción completa guardada en carpeta del video")
+                        st.info(f"🎯 Transcripción completada con {api_usada} — **{i+1}/{total_pasada}**")
                 except Exception as e:
-                    log_warning(f"Error guardando transcripción completa: {e}", func_name)
-
-            # Buscar términos - VERSIÓN CORREGIDA Y MEJORADA
-            text_lower = transcripcion_mistral.lower()
-        
-            # ========== ALIASES DE TÉRMINOS (SINÓNIMOS) ==========
-            # Diccionario que mapea variantes/errores comunes a sus términos correctos
-            # Formato: {'termino_buscado': ['alias1', 'alias2', ...]}
-            # Si buscas "intrant", también buscará "intran"
-            ALIASES_TERMINOS = {
-                'intrant': ['intran', 'in tran', 'in trant', 'intrans'],
-                'edesur': ['ede sur', 'ede-sur'],
-                'edenorte': ['ede norte', 'ede-norte'],
-                'edeeste': ['ede este', 'ede-este'],
-                'celso marranzini': ['celso marrancini', 'celsomarranzini', 'celsomarrancini'],
-            }
-
-            # No aplicar sufijos automáticos (-s/-es/-a/-o) a estos términos: p. ej. "miner"+"a"/"o"
-            # coincide con "minera"/"minero" (minería) y genera falsos positivos frente a MINERD.
-            TERMINOS_SIN_VARIACION_MORFOLOGICA = frozenset({'miner', 'minerd'})
-        
-            # Función auxiliar para buscar término con variaciones
-            def buscar_termino_flexible(termino, texto):
-                """Busca un término considerando variaciones comunes y aliases"""
-                termino_lower = termino.lower()
-                # Búsqueda exacta primero
-                if re.search(rf"\b{re.escape(termino)}\b", texto):
-                    return True, termino
-            
-                # 🆕 BUSCAR ALIASES (sinónimos/variantes conocidas)
-                aliases_buscar = ALIASES_TERMINOS.get(termino_lower, [])
-                for alias in aliases_buscar:
-                    if re.search(rf"\b{re.escape(alias)}\b", texto):
-                        return True, termino  # Retorna el término original, no el alias
-                
-                # 🆕 BUSCAR SI EL TÉRMINO ES UN ALIAS DE OTRO
-                # Ejemplo: si buscas "intran", verificar si es alias de "intrant"
-                for termino_principal, lista_aliases in ALIASES_TERMINOS.items():
-                    if termino_lower in lista_aliases:
-                        # Buscar el término principal
-                        if re.search(rf"\b{re.escape(termino_principal)}\b", texto):
-                            return True, termino
-            
-                # Buscar variaciones comunes (plurales, conjugaciones básicas)
-                if termino_lower not in TERMINOS_SIN_VARIACION_MORFOLOGICA:
-                    variaciones = [
-                        termino + "s",  # plural
-                        termino + "es", # plural alternativo
-                        termino + "a",  # género femenino
-                        termino + "o",  # género masculino
-                    ]
-            
-                    for variacion in variaciones:
-                        if re.search(rf"\b{re.escape(variacion)}\b", texto):
-                            return True, variacion
-                
-                # 🆕 NORMALIZACIÓN DE ESPACIOS: Buscar sin espacios
-                # Ejemplo: "celsomarrancini" encontrará "celso marranzini" o "Celsomarrancini"
-                # PERO NO hará match parcial: "edesur" NO encontrará "desur"
-                termino_sin_espacios = termino.replace(" ", "").lower()
-                
-                # Buscar palabras consecutivas que al juntar coincidan EXACTAMENTE
-                palabras = texto.split()
-                for i in range(len(palabras)):
-                    for j in range(i+1, min(i+6, len(palabras)+1)):  # Buscar hasta 5 palabras consecutivas
-                        fragmento_sin_espacios = "".join(palabras[i:j]).lower()
-                        # Match EXACTO, no substring
-                        if termino_sin_espacios == fragmento_sin_espacios:
-                            termino_encontrado = " ".join(palabras[i:j])
-                            return True, termino_encontrado
-            
-                return False, None
-        
-            # ========== TÉRMINOS PRIORITARIOS ==========
-            # Estos términos SIEMPRE deben generar clips cuando se mencionen
-            # No se aplicarán verificaciones estrictas de relevancia a estos términos
-            TERMINOS_PRIORITARIOS = {
-                'edesur', 'edenorte', 'edeeste',
-                'punta catalina',
-                'apagones',
-                'egehid', 'ede hid',
-                'celso marranzini', 'celso', 'marranzini', 'celsomarrancini',
-                'protecom',
-                'pegase', 'pégase'
-            }
-            
-            # ========== CONTROL DE DUPLICADOS MEJORADO ==========
-            # Lista para rastrear timestamps ya procesados para evitar clips duplicados
-            timestamps_procesados = []
-            # Lista para rastrear combinaciones de término + timestamp ya procesadas
-            coincidencias_procesadas = set()
-        
-            for termino_item in terminos:
-                # Extraer el string del término (soporta dict y string)
-                if isinstance(termino_item, dict):
-                    termino = termino_item.get('termino', '')
-                else:
-                    termino = str(termino_item)
-                
-                if not termino:
-                    continue
-                    
-                # PRIMERA VERIFICACIÓN: ¿El término (o variaciones) existe en la transcripción completa?
-                encontrado, termino_encontrado = buscar_termino_flexible(termino, text_lower)
-            
-                if encontrado:
-                    log_info(f"Término '{termino}' encontrado en transcripción completa", func_name)
-                    
-                    # Verificar si es un término prioritario
-                    es_prioritario = termino.lower() in TERMINOS_PRIORITARIOS
-                    if es_prioritario:
-                        log_info(f"⭐ '{termino}' es un TÉRMINO PRIORITARIO - se aplicarán reglas flexibles", func_name)
-                        st.info(f"⭐ Término prioritario detectado: '{termino}'")
-                
-                    mejor_timestamp = None
-                    mejor_texto_contexto = ""
-                
-                    # SEGUNDA VERIFICACIÓN: ¿El término existe en algún segmento específico con timestamp?
-                    for seg in segments_timestamps:
-                        seg_encontrado, seg_termino_encontrado = buscar_termino_flexible(termino, seg['text'].lower())
-                        if seg_encontrado:
-                            mejor_timestamp = seg
-                            mejor_texto_contexto = seg['text']
-                            log_info(f"Término '{termino}' (variante: '{seg_termino_encontrado}') encontrado en segmento: {seg['text'][:100]}...", func_name)
-                            break
-                
-                    # VERIFICACIÓN CRÍTICA: Solo continuar si encontramos el término en un segmento específico
-                    # EXCEPCIÓN: Para términos prioritarios, buscar en todos los segmentos y usar el primero disponible
-                    if not mejor_timestamp:
-                        if es_prioritario and segments_timestamps:
-                            # Para términos prioritarios, usar el segmento central como fallback
-                            mejor_timestamp = segments_timestamps[len(segments_timestamps) // 2]
-                            mejor_texto_contexto = mejor_timestamp['text']
-                            log_info(f"⭐ TÉRMINO PRIORITARIO '{termino}': Usando segmento central como fallback", func_name)
-                            st.info(f"⭐ Término prioritario '{termino}': Generando clip desde segmento representativo")
-                        else:
-                            log_warning(f"⚠️ TÉRMINO '{termino}' ENCONTRADO EN TRANSCRIPCIÓN GENERAL PERO NO EN SEGMENTOS ESPECÍFICOS", func_name)
-                            log_warning(f"   - Esto puede indicar error de transcripción o segmentación", func_name)
-                            log_warning(f"   - NO se generará clip para evitar falsos positivos", func_name)
-                            st.warning(f"⚠️ Término '{termino}' encontrado en transcripción general pero no en momento específico - OMITIDO")
-                            continue  # ❌ NO GENERAR CLIP - SALTAR AL SIGUIENTE TÉRMINO
-                
-                    # ========== CONTROL DE DUPLICADOS MEJORADO ==========
-                    timestamp_actual = mejor_timestamp['start']
-                    
-                    # Crear clave única para esta coincidencia (término + timestamp + archivo)
-                    clave_coincidencia = f"{termino}_{timestamp_actual:.1f}_{rel}"
-                    
-                    # Verificar si ya procesamos esta coincidencia exacta
-                    if clave_coincidencia in coincidencias_procesadas:
-                        log_info(f"⏭️ DUPLICADO DETECTADO: '{termino}' en {timestamp_actual:.1f}s ya procesado para {rel}", func_name)
-                        st.info(f"⏭️ Coincidencia duplicada evitada: '{termino}' en {timestamp_actual:.1f}s")
-                        continue  # ❌ NO GENERAR CLIP DUPLICADO
-                    
-                    # Verificar si ya procesamos un clip para este timestamp (tolerancia de ±60 segundos - 1 minuto)
-                    es_duplicado = False
-                    for ts_procesado in timestamps_procesados:
-                        diferencia = abs(timestamp_actual - ts_procesado)
-                        if diferencia <= 60:  # Tolerancia de 60 segundos (1 minuto) para evitar clips repetitivos
-                            es_duplicado = True
-                            log_info(f"⏭️ Término '{termino}' OMITIDO - Ya existe clip para timestamp similar ({diferencia:.1f}s de diferencia, mínimo requerido: 60s)", func_name)
-                            st.info(f"⏭️ Término '{termino}' omitido - Ya existe clip reciente (separación mínima: 1 minuto)")
-                            break
-                
-                    if es_duplicado:
-                        continue  # ❌ NO GENERAR CLIP DUPLICADO - SALTAR AL SIGUIENTE TÉRMINO
-                
-                    # Agregar a las listas de control
-                    timestamps_procesados.append(timestamp_actual)
-                    coincidencias_procesadas.add(clave_coincidencia)
-                    log_info(f"✅ Timestamp {timestamp_actual}s agregado a lista de procesados", func_name)
-                    log_info(f"✅ Coincidencia '{clave_coincidencia}' registrada para evitar duplicados", func_name)
-
-                    m, s = divmod(int(mejor_timestamp['start']), 60)
-                    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-                
-                    # SUBCARPETA PARA ESTE TÉRMINO ESPECÍFICO
-                    clip_dir = os.path.join(archivo_main_dir, f"c_clip_{termino}")
-                    os.makedirs(clip_dir, exist_ok=True)
-                    log_info(f"Subcarpeta de clip creada: {clip_dir}", func_name)
-
-                    # ========== 🌟 USAR GEMINI 3 PRO PARA DETERMINAR SEGMENTO INTELIGENTE ==========
-                    momento_termino = mejor_timestamp['start']
-                    
-                    st.info(f"🌟 Analizando con Gemini 3 Pro el mejor segmento para '{termino}'...")
-                    log_info(f"🌟 Solicitando análisis GEMINI 3 PRO para término '{termino}' en timestamp {momento_termino:.1f}s", func_name)
-                    
-                    # Variable para almacenar la idea central extraída por Gemini
-                    idea_central_gemini = ""
-                    
-                    try:
-                        # Llamar a GEMINI 3 PRO para determinar el segmento más lógico
-                        segmento_gemini = determinar_segmento_inteligente_gemini(
-                            transcripcion_con_timestamps=segments_timestamps,
-                            termino_encontrado=termino,
-                            timestamp_coincidencia=momento_termino,
-                            duracion_maxima=duracion_clip
+                    if es_error_archivo_en_uso(e):
+                        encolar_video_en_uso_fin_ciclo(
+                            archivo_path, rel, f"transcripción bloqueada: {e}", cola_en_uso
                         )
-                        
-                        # 🚫 VERIFICAR SI GEMINI RECHAZÓ EL SEGMENTO
-                        if segmento_gemini is None:
-                            log_warning(f"🚫 Gemini rechazó el segmento para '{termino}' - Mención tangencial", func_name)
-                            st.warning(f"🚫 Término '{termino}' rechazado: Solo se menciona de pasada sin desarrollar el tema")
-                            razon_ia = _tomar_y_limpiar_razon_rechazo_segmento_ia()
-                            if not razon_ia:
-                                razon_ia = "Mención tangencial sin desarrollo (el modelo no devolvió texto de motivo)."
-                            ev_txt = extraer_texto_transcripcion_ventana(
-                                segments_timestamps, momento_termino, ventana_seg=120, duracion_audio=dur_total
-                            )
-                            if not (ev_txt or "").strip():
-                                ev_txt = (mejor_texto_contexto or "").strip()
-                            ctx_drive = (
-                                f"Motivo (análisis de segmento):\n{razon_ia}\n\n"
-                                f"Ventana de transcripción (~±120s):\n{(ev_txt or '')[:12000]}"
-                            )
-                            _destino_video_check, _txt_video_check, estado_videoscheck = guardar_video_y_minuto_coincidencia(
-                                video_path=archivo_path,
-                                minuto_detectado=momento_termino,
-                                termino_detectado=termino,
-                                mover_video=False,
-                                prefijo_carpeta="_tangencial_"
-                            )
-                            drive_url = ""
-                            if estado_videoscheck in ("copiado", "movido", "ya_existia"):
-                                st.info(f"📁 videoscheck ({estado_videoscheck}): `{_destino_video_check}`")
-                                _ok_gd_t, _msg_gd_t, drive_url = subir_tangencial_videoscheck_a_google_drive(
-                                    obtener_cliente_por_termino(termino),
-                                    _destino_video_check,
-                                    _txt_video_check,
-                                    ctx_drive,
+                        continue
+                    _ui_transient("error", f"❌ Error en transcripción: {e}")
+                    continue
+                elapsed_mistral = time.time() - start
+
+                # Timestamps: si ya los tenemos (faster/Mistral), usar; si no (OpenAI), obtener con whisper
+                if segments_timestamps is None or len(segments_timestamps) == 0:
+                    progress_bar.progress(55, text="🕐 Obteniendo timestamps (OpenAI no los incluye)...")
+                    start = time.time()
+                    try:
+                        segments_timestamps = obtener_timestamps_whisper(audio_path)
+                    except Exception as e:
+                        _ui_transient("error", f"❌ Error obteniendo timestamps: {e}")
+                        continue
+                    elapsed_whisper = time.time() - start
+                else:
+                    if not mostrar_solo_relevantes:
+                        st.success(f"✅ Timestamps incluidos en la transcripción — sin paso adicional")
+
+                progress_bar.progress(80, text="🔍 Buscando coincidencias...")
+        
+                coincidencias_md = []
+                coincidencias_items = []
+                # Crear carpeta principal del archivo (una sola vez)
+                archivo_name_clean = os.path.splitext(rel)[0]  # Sin extensión
+                archivo_name_safe = "".join(c for c in archivo_name_clean if c.isalnum() or c in (' ', '-', '_')).rstrip()
+                archivo_name_safe = archivo_name_safe.replace(' ', '_')[:50]  # Máximo 50 caracteres
+                fecha_folder = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+                # CARPETA PRINCIPAL DEL ARCHIVO (contiene todos los clips) - EN CARPETA PROCESADOS
+                archivo_main_dir = os.path.join(CARPETA_PROCESADOS, f"c_{archivo_name_safe}_{fecha_folder}")
+                os.makedirs(archivo_main_dir, exist_ok=True)
+                log_info(f"Carpeta de coincidencias creada: {archivo_main_dir}", func_name)
+        
+                # Crear archivo marcador P* en la carpeta principal
+                marcador_path = os.path.join(archivo_main_dir, "PROCESADO.txt")
+                if not os.path.exists(marcador_path):
+                    # Extraer nombres de términos (soporta dict y string)
+                    terminos_nombres = [t.get('termino', str(t)) if isinstance(t, dict) else str(t) for t in terminos]
+                    with open(marcador_path, "w", encoding="utf-8") as f:
+                        f.write(f"🚫 CARPETA PROCESADA - NO REPROCESAR\n")
+                        f.write(f"Fecha creación: {datetime.now().isoformat()}\n")
+                        f.write(f"Archivo origen: {rel} ({tipo_archivo})\n")
+                        f.write(f"Términos encontrados: {', '.join(terminos_nombres)}\n")
+                        f.write(f"Generado por: Video Analyzer IA v4.0\n")
+            
+                # ========== GUARDAR TRANSCRIPCIÓN COMPLETA DEL VIDEO ==========
+                transcripcion_completa_path = os.path.join(archivo_main_dir, "TRANSCRIPCION_COMPLETA.txt")
+                if not os.path.exists(transcripcion_completa_path):
+                    try:
+                        # Extraer nombres de términos (soporta dict y string)
+                        terminos_nombres_transcripcion = [t.get('termino', str(t)) if isinstance(t, dict) else str(t) for t in terminos]
+                        with open(transcripcion_completa_path, "w", encoding="utf-8") as f:
+                            f.write(f"📝 TRANSCRIPCIÓN COMPLETA DEL VIDEO\n")
+                            f.write(f"{'='*80}\n\n")
+                            f.write(f"📹 VIDEO: {rel}\n")
+                            f.write(f"📅 FECHA DE ANÁLISIS: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                            f.write(f"🧠 MOTOR DE TRANSCRIPCIÓN: {api_usada}\n")
+                            if dur_total is not None:
+                                f.write(
+                                    f"⏱️ DURACIÓN TOTAL: {dur_total:.1f} segundos "
+                                    f"({int(dur_total // 60)}:{int(dur_total % 60):02d})\n"
                                 )
-                                if _ok_gd_t:
-                                    st.info(f"☁️ Drive (tangenciales): {_msg_gd_t}")
                             else:
-                                log_warning(f"⚠️ No se pudo enviar a videoscheck (rechazo tangencial): {estado_videoscheck}", func_name)
-                            _item_tang = crear_item_tangencial(
-                                    rel,
-                                    termino,
-                                    razon_ia,
-                                    momento_termino,
-                                    texto_evidencia=ev_txt,
-                                    url_drive_video=drive_url or "",
-                                    transcripcion_extracto=(mejor_texto_contexto or "")[:2500],
-                                )
-                            menciones_tangenciales_data.append(_item_tang)
-                            try:
-                                enriquecer_motivos_tangenciales_deepseek(
-                                    [_item_tang], func_name=func_name
-                                )
-                            except Exception as e_enr:
-                                log_warning(
-                                    f"⚠️ DeepSeek tangencial (previo Brevo inmediato) omitido: {e_enr}",
-                                    func_name,
-                                )
-                            _cli_tang = obtener_cliente_por_termino(termino)
-                            notificar_brevo_tangencial_inmediato_si(_cli_tang, _item_tang, func_name)
-                            notificar_google_sheets_tangencial_inmediato_si(_cli_tang, _item_tang, func_name)
-                            continue  # ❌ NO GENERAR CLIP - SALTAR AL SIGUIENTE TÉRMINO
+                                f.write("⏱️ DURACIÓN TOTAL: no disponible (ffprobe no devolvió duración)\n")
+                            f.write(f"🔍 TÉRMINOS BUSCADOS: {', '.join(terminos_nombres_transcripcion)}\n")
+                            f.write(f"\n{'='*80}\n")
+                            f.write(f"TRANSCRIPCIÓN:\n")
+                            f.write(f"{'='*80}\n\n")
+                            f.write(transcripcion_mistral)
+                            f.write(f"\n\n{'='*80}\n")
+                            f.write(f"📊 ESTADÍSTICAS:\n")
+                            f.write(f"- Total de palabras: {len(transcripcion_mistral.split())}\n")
+                            f.write(f"- Total de caracteres: {len(transcripcion_mistral)}\n")
+                            f.write(f"\n{'='*80}\n")
+                            f.write(f"✅ Generado automáticamente por Video Analyzer IA v4.0\n")
+                    
+                        log_info(f"✅ Transcripción completa guardada: {transcripcion_completa_path}", func_name)
+                        if not mostrar_solo_relevantes:
+                            st.info(f"💾 Transcripción completa guardada en carpeta del video")
+                    except Exception as e:
+                        log_warning(f"Error guardando transcripción completa: {e}", func_name)
+
+                # Buscar términos - VERSIÓN CORREGIDA Y MEJORADA
+                text_lower = transcripcion_mistral.lower()
+        
+                # ========== ALIASES DE TÉRMINOS (SINÓNIMOS) ==========
+                # Diccionario que mapea variantes/errores comunes a sus términos correctos
+                # Formato: {'termino_buscado': ['alias1', 'alias2', ...]}
+                # Si buscas "intrant", también buscará "intran"
+                ALIASES_TERMINOS = {
+                    'intrant': ['intran', 'in tran', 'in trant', 'intrans'],
+                    'edesur': ['ede sur', 'ede-sur'],
+                    'edenorte': ['ede norte', 'ede-norte'],
+                    'edeeste': ['ede este', 'ede-este'],
+                    'celso marranzini': ['celso marrancini', 'celsomarranzini', 'celsomarrancini'],
+                }
+
+                # No aplicar sufijos automáticos (-s/-es/-a/-o) a estos términos: p. ej. "miner"+"a"/"o"
+                # coincide con "minera"/"minero" (minería) y genera falsos positivos frente a MINERD.
+                TERMINOS_SIN_VARIACION_MORFOLOGICA = frozenset({'miner', 'minerd'})
+        
+                # Función auxiliar para buscar término con variaciones
+                def buscar_termino_flexible(termino, texto):
+                    """Busca un término considerando variaciones comunes y aliases"""
+                    termino_lower = termino.lower()
+                    # Búsqueda exacta primero
+                    if re.search(rf"\b{re.escape(termino)}\b", texto):
+                        return True, termino
+            
+                    # 🆕 BUSCAR ALIASES (sinónimos/variantes conocidas)
+                    aliases_buscar = ALIASES_TERMINOS.get(termino_lower, [])
+                    for alias in aliases_buscar:
+                        if re.search(rf"\b{re.escape(alias)}\b", texto):
+                            return True, termino  # Retorna el término original, no el alias
+                
+                    # 🆕 BUSCAR SI EL TÉRMINO ES UN ALIAS DE OTRO
+                    # Ejemplo: si buscas "intran", verificar si es alias de "intrant"
+                    for termino_principal, lista_aliases in ALIASES_TERMINOS.items():
+                        if termino_lower in lista_aliases:
+                            # Buscar el término principal
+                            if re.search(rf"\b{re.escape(termino_principal)}\b", texto):
+                                return True, termino
+            
+                    # Buscar variaciones comunes (plurales, conjugaciones básicas)
+                    if termino_lower not in TERMINOS_SIN_VARIACION_MORFOLOGICA:
+                        variaciones = [
+                            termino + "s",  # plural
+                            termino + "es", # plural alternativo
+                            termino + "a",  # género femenino
+                            termino + "o",  # género masculino
+                        ]
+            
+                        for variacion in variaciones:
+                            if re.search(rf"\b{re.escape(variacion)}\b", texto):
+                                return True, variacion
+                
+                    # 🆕 NORMALIZACIÓN DE ESPACIOS: Buscar sin espacios
+                    # Ejemplo: "celsomarrancini" encontrará "celso marranzini" o "Celsomarrancini"
+                    # PERO NO hará match parcial: "edesur" NO encontrará "desur"
+                    termino_sin_espacios = termino.replace(" ", "").lower()
+                
+                    # Buscar palabras consecutivas que al juntar coincidan EXACTAMENTE
+                    palabras = texto.split()
+                    for i in range(len(palabras)):
+                        for j in range(i+1, min(i+6, len(palabras)+1)):  # Buscar hasta 5 palabras consecutivas
+                            fragmento_sin_espacios = "".join(palabras[i:j]).lower()
+                            # Match EXACTO, no substring
+                            if termino_sin_espacios == fragmento_sin_espacios:
+                                termino_encontrado = " ".join(palabras[i:j])
+                                return True, termino_encontrado
+            
+                    return False, None
+        
+                # ========== TÉRMINOS PRIORITARIOS ==========
+                # Estos términos SIEMPRE deben generar clips cuando se mencionen
+                # No se aplicarán verificaciones estrictas de relevancia a estos términos
+                TERMINOS_PRIORITARIOS = {
+                    'edesur', 'edenorte', 'edeeste',
+                    'punta catalina',
+                    'apagones',
+                    'egehid', 'ede hid',
+                    'celso marranzini', 'celso', 'marranzini', 'celsomarrancini',
+                    'protecom',
+                    'pegase', 'pégase'
+                }
+            
+                # ========== CONTROL DE DUPLICADOS MEJORADO ==========
+                # Lista para rastrear timestamps ya procesados para evitar clips duplicados
+                timestamps_procesados = []
+                # Lista para rastrear combinaciones de término + timestamp ya procesadas
+                coincidencias_procesadas = set()
+        
+                for termino_item in terminos:
+                    # Extraer el string del término (soporta dict y string)
+                    if isinstance(termino_item, dict):
+                        termino = termino_item.get('termino', '')
+                    else:
+                        termino = str(termino_item)
+                
+                    if not termino:
+                        continue
+                    
+                    # PRIMERA VERIFICACIÓN: ¿El término (o variaciones) existe en la transcripción completa?
+                    encontrado, termino_encontrado = buscar_termino_flexible(termino, text_lower)
+            
+                    if encontrado:
+                        log_info(f"Término '{termino}' encontrado en transcripción completa", func_name)
+                    
+                        # Verificar si es un término prioritario
+                        es_prioritario = termino.lower() in TERMINOS_PRIORITARIOS
+                        if es_prioritario:
+                            log_info(f"⭐ '{termino}' es un TÉRMINO PRIORITARIO - se aplicarán reglas flexibles", func_name)
+                            st.info(f"⭐ Término prioritario detectado: '{termino}'")
+                
+                        mejor_timestamp = None
+                        mejor_texto_contexto = ""
+                
+                        # SEGUNDA VERIFICACIÓN: ¿El término existe en algún segmento específico con timestamp?
+                        for seg in segments_timestamps:
+                            seg_encontrado, seg_termino_encontrado = buscar_termino_flexible(termino, seg['text'].lower())
+                            if seg_encontrado:
+                                mejor_timestamp = seg
+                                mejor_texto_contexto = seg['text']
+                                log_info(f"Término '{termino}' (variante: '{seg_termino_encontrado}') encontrado en segmento: {seg['text'][:100]}...", func_name)
+                                break
+                
+                        # VERIFICACIÓN CRÍTICA: Solo continuar si encontramos el término en un segmento específico
+                        # EXCEPCIÓN: Para términos prioritarios, buscar en todos los segmentos y usar el primero disponible
+                        if not mejor_timestamp:
+                            if es_prioritario and segments_timestamps:
+                                # Para términos prioritarios, usar el segmento central como fallback
+                                mejor_timestamp = segments_timestamps[len(segments_timestamps) // 2]
+                                mejor_texto_contexto = mejor_timestamp['text']
+                                log_info(f"⭐ TÉRMINO PRIORITARIO '{termino}': Usando segmento central como fallback", func_name)
+                                st.info(f"⭐ Término prioritario '{termino}': Generando clip desde segmento representativo")
+                            else:
+                                log_warning(f"⚠️ TÉRMINO '{termino}' ENCONTRADO EN TRANSCRIPCIÓN GENERAL PERO NO EN SEGMENTOS ESPECÍFICOS", func_name)
+                                log_warning(f"   - Esto puede indicar error de transcripción o segmentación", func_name)
+                                log_warning(f"   - NO se generará clip para evitar falsos positivos", func_name)
+                                st.warning(f"⚠️ Término '{termino}' encontrado en transcripción general pero no en momento específico - OMITIDO")
+                                continue  # ❌ NO GENERAR CLIP - SALTAR AL SIGUIENTE TÉRMINO
+                
+                        # ========== CONTROL DE DUPLICADOS MEJORADO ==========
+                        timestamp_actual = mejor_timestamp['start']
+                    
+                        # Crear clave única para esta coincidencia (término + timestamp + archivo)
+                        clave_coincidencia = f"{termino}_{timestamp_actual:.1f}_{rel}"
+                    
+                        # Verificar si ya procesamos esta coincidencia exacta
+                        if clave_coincidencia in coincidencias_procesadas:
+                            log_info(f"⏭️ DUPLICADO DETECTADO: '{termino}' en {timestamp_actual:.1f}s ya procesado para {rel}", func_name)
+                            st.info(f"⏭️ Coincidencia duplicada evitada: '{termino}' en {timestamp_actual:.1f}s")
+                            continue  # ❌ NO GENERAR CLIP DUPLICADO
+                    
+                        # Verificar si ya procesamos un clip para este timestamp (tolerancia de ±60 segundos - 1 minuto)
+                        es_duplicado = False
+                        for ts_procesado in timestamps_procesados:
+                            diferencia = abs(timestamp_actual - ts_procesado)
+                            if diferencia <= 60:  # Tolerancia de 60 segundos (1 minuto) para evitar clips repetitivos
+                                es_duplicado = True
+                                log_info(f"⏭️ Término '{termino}' OMITIDO - Ya existe clip para timestamp similar ({diferencia:.1f}s de diferencia, mínimo requerido: 60s)", func_name)
+                                st.info(f"⏭️ Término '{termino}' omitido - Ya existe clip reciente (separación mínima: 1 minuto)")
+                                break
+                
+                        if es_duplicado:
+                            continue  # ❌ NO GENERAR CLIP DUPLICADO - SALTAR AL SIGUIENTE TÉRMINO
+                
+                        # Agregar a las listas de control
+                        timestamps_procesados.append(timestamp_actual)
+                        coincidencias_procesadas.add(clave_coincidencia)
+                        log_info(f"✅ Timestamp {timestamp_actual}s agregado a lista de procesados", func_name)
+                        log_info(f"✅ Coincidencia '{clave_coincidencia}' registrada para evitar duplicados", func_name)
+
+                        m, s = divmod(int(mejor_timestamp['start']), 60)
+                        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                
+                        # SUBCARPETA PARA ESTE TÉRMINO ESPECÍFICO
+                        clip_dir = os.path.join(archivo_main_dir, f"c_clip_{termino}")
+                        os.makedirs(clip_dir, exist_ok=True)
+                        log_info(f"Subcarpeta de clip creada: {clip_dir}", func_name)
+
+                        # ========== 🌟 USAR GEMINI 3 PRO PARA DETERMINAR SEGMENTO INTELIGENTE ==========
+                        momento_termino = mejor_timestamp['start']
+                    
+                        st.info(f"🌟 Analizando con Gemini 3 Pro el mejor segmento para '{termino}'...")
+                        log_info(f"🌟 Solicitando análisis GEMINI 3 PRO para término '{termino}' en timestamp {momento_termino:.1f}s", func_name)
+                    
+                        # Variable para almacenar la idea central extraída por Gemini
+                        idea_central_gemini = ""
+                    
+                        try:
+                            # Llamar a GEMINI 3 PRO para determinar el segmento más lógico
+                            segmento_gemini = determinar_segmento_inteligente_gemini(
+                                transcripcion_con_timestamps=segments_timestamps,
+                                termino_encontrado=termino,
+                                timestamp_coincidencia=momento_termino,
+                                duracion_maxima=duracion_clip
+                            )
                         
-                        # Usar los valores determinados por Gemini
-                        inicio = segmento_gemini['inicio']
-                        fin_clip = segmento_gemini['fin']
-                        duracion_clip_real = segmento_gemini['duracion']
-                        razon_segmento = segmento_gemini['razon']
-                        idea_central_gemini = segmento_gemini.get('idea_central', '')  # Nueva: idea centrada
+                            # 🚫 VERIFICAR SI GEMINI RECHAZÓ EL SEGMENTO
+                            if segmento_gemini is None:
+                                log_warning(f"🚫 Gemini rechazó el segmento para '{termino}' - Mención tangencial", func_name)
+                                st.warning(f"🚫 Término '{termino}' rechazado: Solo se menciona de pasada sin desarrollar el tema")
+                                razon_ia = _tomar_y_limpiar_razon_rechazo_segmento_ia()
+                                if not razon_ia:
+                                    razon_ia = "Mención tangencial sin desarrollo (el modelo no devolvió texto de motivo)."
+                                ev_txt = extraer_texto_transcripcion_ventana(
+                                    segments_timestamps, momento_termino, ventana_seg=120, duracion_audio=dur_total
+                                )
+                                if not (ev_txt or "").strip():
+                                    ev_txt = (mejor_texto_contexto or "").strip()
+                                ctx_drive = (
+                                    f"Motivo (análisis de segmento):\n{razon_ia}\n\n"
+                                    f"Ventana de transcripción (~±120s):\n{(ev_txt or '')[:12000]}"
+                                )
+                                _destino_video_check, _txt_video_check, estado_videoscheck = guardar_video_y_minuto_coincidencia(
+                                    video_path=archivo_path,
+                                    minuto_detectado=momento_termino,
+                                    termino_detectado=termino,
+                                    mover_video=False,
+                                    prefijo_carpeta="_tangencial_"
+                                )
+                                drive_url = ""
+                                if estado_videoscheck in ("copiado", "movido", "ya_existia"):
+                                    st.info(f"📁 videoscheck ({estado_videoscheck}): `{_destino_video_check}`")
+                                    _ok_gd_t, _msg_gd_t, drive_url = subir_tangencial_videoscheck_a_google_drive(
+                                        obtener_cliente_por_termino(termino),
+                                        _destino_video_check,
+                                        _txt_video_check,
+                                        ctx_drive,
+                                    )
+                                    if _ok_gd_t:
+                                        st.info(f"☁️ Drive (tangenciales): {_msg_gd_t}")
+                                else:
+                                    log_warning(f"⚠️ No se pudo enviar a videoscheck (rechazo tangencial): {estado_videoscheck}", func_name)
+                                _item_tang = crear_item_tangencial(
+                                        rel,
+                                        termino,
+                                        razon_ia,
+                                        momento_termino,
+                                        texto_evidencia=ev_txt,
+                                        url_drive_video=drive_url or "",
+                                        transcripcion_extracto=(mejor_texto_contexto or "")[:2500],
+                                    )
+                                menciones_tangenciales_data.append(_item_tang)
+                                try:
+                                    enriquecer_motivos_tangenciales_deepseek(
+                                        [_item_tang], func_name=func_name
+                                    )
+                                except Exception as e_enr:
+                                    log_warning(
+                                        f"⚠️ DeepSeek tangencial (previo Brevo inmediato) omitido: {e_enr}",
+                                        func_name,
+                                    )
+                                _cli_tang = obtener_cliente_por_termino(termino)
+                                notificar_brevo_tangencial_inmediato_si(_cli_tang, _item_tang, func_name)
+                                notificar_google_sheets_tangencial_inmediato_si(_cli_tang, _item_tang, func_name)
+                                continue  # ❌ NO GENERAR CLIP - SALTAR AL SIGUIENTE TÉRMINO
                         
-                        # 📏 EXPANSIÓN AUTOMÁTICA: Si el usuario pide 90s y la IA da menos, expandir
-                        # Esto cumple con el requisito de "no quiero videos de menos de 90"
-                        if duracion_clip_real < duracion_clip:
-                            log_info(f"📏 Expandiendo clip de {duracion_clip_real:.1f}s a {duracion_clip:.1f}s", func_name)
-                            dif = duracion_clip - duracion_clip_real
-                            inicio = max(0, inicio - (dif / 2))
+                            # Usar los valores determinados por Gemini
+                            inicio = segmento_gemini['inicio']
+                            fin_clip = segmento_gemini['fin']
+                            duracion_clip_real = segmento_gemini['duracion']
+                            razon_segmento = segmento_gemini['razon']
+                            idea_central_gemini = segmento_gemini.get('idea_central', '')  # Nueva: idea centrada
+                        
+                            # 📏 EXPANSIÓN AUTOMÁTICA: Si el usuario pide 90s y la IA da menos, expandir
+                            # Esto cumple con el requisito de "no quiero videos de menos de 90"
+                            if duracion_clip_real < duracion_clip:
+                                log_info(f"📏 Expandiendo clip de {duracion_clip_real:.1f}s a {duracion_clip:.1f}s", func_name)
+                                dif = duracion_clip - duracion_clip_real
+                                inicio = max(0, inicio - (dif / 2))
+                                fin_clip = inicio + duracion_clip
+                                duracion_clip_real = duracion_clip
+                                razon_segmento += f" (Expandido para cumplir {duracion_clip}s)"
+                        
+                            log_info(f"✅ Gemini 3 Pro determinó segmento inteligente:", func_name)
+                            log_info(f"  - Inicio: {inicio:.2f}s", func_name)
+                            log_info(f"  - Fin: {fin_clip:.2f}s", func_name)
+                            log_info(f"  - Duración: {duracion_clip_real:.2f}s", func_name)
+                            log_info(f"  - Razón: {razon_segmento}", func_name)
+                            if idea_central_gemini:
+                                log_info(f"  - Idea central: {idea_central_gemini[:100]}...", func_name)
+                        
+                        except Exception as e:
+                            # Fallback al método tradicional si Gemini falla
+                            log_warning(f"⚠️ Error en Gemini, usando método tradicional: {e}", func_name)
+                            st.warning(f"⚠️ Gemini no disponible, usando método tradicional")
+                        
+                            inicio = max(0, momento_termino - buffer_anterior)
                             fin_clip = inicio + duracion_clip
                             duracion_clip_real = duracion_clip
-                            razon_segmento += f" (Expandido para cumplir {duracion_clip}s)"
-                        
-                        log_info(f"✅ Gemini 3 Pro determinó segmento inteligente:", func_name)
-                        log_info(f"  - Inicio: {inicio:.2f}s", func_name)
-                        log_info(f"  - Fin: {fin_clip:.2f}s", func_name)
-                        log_info(f"  - Duración: {duracion_clip_real:.2f}s", func_name)
-                        log_info(f"  - Razón: {razon_segmento}", func_name)
-                        if idea_central_gemini:
-                            log_info(f"  - Idea central: {idea_central_gemini[:100]}...", func_name)
-                        
-                    except Exception as e:
-                        # Fallback al método tradicional si Gemini falla
-                        log_warning(f"⚠️ Error en Gemini, usando método tradicional: {e}", func_name)
-                        st.warning(f"⚠️ Gemini no disponible, usando método tradicional")
-                        
-                        inicio = max(0, momento_termino - buffer_anterior)
-                        fin_clip = inicio + duracion_clip
-                        duracion_clip_real = duracion_clip
-                        razon_segmento = "Método tradicional (centrado en coincidencia)"
+                            razon_segmento = "Método tradicional (centrado en coincidencia)"
                     
-                    # VERIFICAR LÍMITES DEL VIDEO: Asegurar que no se exceda la duración del video
-                    try:
-                        _pro = _ruta_ejecutable_ffprobe()
-                        if not _pro:
-                            raise RuntimeError("ffprobe no disponible")
-                        _vid = os.path.abspath(os.path.normpath(archivo_path))
-                        cmd_duracion = [
-                            _pro,
-                            "-v",
-                            "quiet",
-                            "-show_entries",
-                            "format=duration",
-                            "-of",
-                            "csv=p=0",
-                            "-i",
-                            _vid,
-                        ]
-                        resultado = subprocess.run(
-                            cmd_duracion,
-                            capture_output=True,
-                            text=True,
-                            check=True,
-                            **_subprocess_no_window_kw(),
-                        )
-                        duracion_video = float(resultado.stdout.strip())
-                    
-                        log_info(f"📹 Duración del video original: {duracion_video:.2f}s", func_name)
-                    
-                        # Verificar si el clip se excede del video
-                        if fin_clip > duracion_video:
-                            log_warning(f"⚠️ El clip se excede del video ({fin_clip:.2f}s > {duracion_video:.2f}s)", func_name)
-                            st.warning(f"⚠️ Ajustando clip a límites del video")
-                            
-                            # Ajustar para que quepa dentro del video
-                            if duracion_clip_real <= duracion_video:
-                                # Mover el inicio hacia atrás
-                                inicio = max(0, duracion_video - duracion_clip_real)
-                                fin_clip = duracion_video
-                            else:
-                                # Video más corto que duración deseada
-                                inicio = 0
-                                fin_clip = duracion_video
-                                duracion_clip_real = duracion_video
-                            
-                            log_info(f"  - Segmento ajustado: {inicio:.2f}s - {fin_clip:.2f}s ({duracion_clip_real:.2f}s)", func_name)
-                    
-                    except Exception as e:
-                        log_warning(f"⚠️ No se pudo obtener duración del video: {e}", func_name)
-                        log_info("  - Continuando con el clip asumiendo que hay suficiente duración", func_name)
-                
-                    # Generar clip de video MP4
-                    clip_name = f"{ts}_{termino}_{m}m{s:02d}s.mp4"
-                    clip_path = os.path.join(clip_dir, clip_name)
-                    _clip_disk_path = clip_path
-                
-                    # Calcular información del clip
-                    buffer_anterior_real = momento_termino - inicio
-                    buffer_posterior_real = fin_clip - momento_termino
-                
-                    st.success(f"🎬 Generando clip inteligente de {duracion_clip_real:.1f}s para '{termino}'")
-                    st.info(f"📊 Segmento: {inicio:.1f}s - {fin_clip:.1f}s | Antes: {buffer_anterior_real:.1f}s | Después: {buffer_posterior_real:.1f}s")
-                    st.info(f"💡 {razon_segmento}")
-                    
-                    # Comando para recortar video con duración exacta determinada por GPT-4o
-                    _ffcut = _ruta_ejecutable_ffmpeg()
-                    if not _ffcut:
-                        raise RuntimeError("ffmpeg no encontrado; no se puede generar el clip.")
-                    cmd = [
-                        _ffcut,
-                        "-y",
-                        "-ss",
-                        str(inicio),
-                        "-t",
-                        str(duracion_clip_real),
-                        "-i",
-                        archivo_path,
-                        "-c:v",
-                        "libx264",
-                        "-c:a",
-                        "aac",
-                        clip_path,
-                    ]
-                
-                    try:
-                        subprocess.run(
-                            cmd,
-                            check=True,
-                            stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL,
-                            **_subprocess_no_window_kw(),
-                        )
-                    
-                        # ========== 🤖 EXTRAER IDEA GENERAL DEL SEGMENTO CON GPT-4o ==========
-                        st.info(f"🤖 Extrayendo idea general del segmento con GPT-4o...")
-                        
-                        # Extraer transcripción solo del segmento del clip
-                        transcripcion_segmento = ""
-                        for seg in segments_timestamps:
-                            # Si el segmento está dentro del rango del clip
-                            if seg['start'] >= inicio and seg['start'] <= fin_clip:
-                                transcripcion_segmento += seg['text'] + " "
-                        
-                        # Si no se encontró transcripción del segmento, usar contexto completo
-                        if not transcripcion_segmento.strip():
-                            transcripcion_segmento = mejor_texto_contexto
-                        
-                        # Llamar a GEMINI 3.0 para extraer idea general (con fallback a GPT-4o)
+                        # VERIFICAR LÍMITES DEL VIDEO: Asegurar que no se exceda la duración del video
                         try:
-                            # Usar Gemini 3.0 como modelo principal
-                            resultado_gemini = extraer_idea_general_segmento_gemini(
-                                transcripcion_segmento=transcripcion_segmento.strip(),
-                                termino_encontrado=termino,
-                                duracion_segundos=duracion_clip_real,
-                                nombre_video=rel
+                            _pro = _ruta_ejecutable_ffprobe()
+                            if not _pro:
+                                raise RuntimeError("ffprobe no disponible")
+                            _vid = os.path.abspath(os.path.normpath(archivo_path))
+                            cmd_duracion = [
+                                _pro,
+                                "-v",
+                                "quiet",
+                                "-show_entries",
+                                "format=duration",
+                                "-of",
+                                "csv=p=0",
+                                "-i",
+                                _vid,
+                            ]
+                            resultado = subprocess.run(
+                                cmd_duracion,
+                                capture_output=True,
+                                text=True,
+                                check=True,
+                                **_subprocess_no_window_kw(),
                             )
+                            duracion_video = float(resultado.stdout.strip())
+                    
+                            log_info(f"📹 Duración del video original: {duracion_video:.2f}s", func_name)
+                    
+                            # Verificar si el clip se excede del video
+                            if fin_clip > duracion_video:
+                                log_warning(f"⚠️ El clip se excede del video ({fin_clip:.2f}s > {duracion_video:.2f}s)", func_name)
+                                st.warning(f"⚠️ Ajustando clip a límites del video")
                             
-                            # Extraer la idea general del resultado estructurado
-                            idea_general_clip = resultado_gemini.get('idea_general', transcripcion_segmento[:600])
-                            relevancia_gemini = resultado_gemini.get('relevancia', 'media')
-                            es_relevante_gemini = resultado_gemini.get('es_relevante', True)
-                            tema_principal = resultado_gemini.get('tema_principal', termino)
-                            contexto_gemini = resultado_gemini.get('contexto', '')
-                            
-                            log_info(f"✅ Análisis Gemini 3.0 - Relevancia: {relevancia_gemini}, Tema: {tema_principal}", func_name)
-                            log_info(f"📝 Idea general: {idea_general_clip[:100]}...", func_name)
-                            
-                            # ========== VERIFICACIÓN DE RELEVANCIA CON GEMINI ==========
-                            # Si Gemini determinó que la mención no es relevante, descartar el clip
-                            # EXCEPCIÓN: NO descartar clips de términos prioritarios
-                            if not es_relevante_gemini or relevancia_gemini == 'baja':
-                                if es_prioritario:
-                                    # Para términos prioritarios, mantener el clip aunque Gemini lo considere no relevante
-                                    log_info(f"⭐ TÉRMINO PRIORITARIO '{termino}': Clip mantenido a pesar de evaluación de relevancia", func_name)
-                                    st.info(f"⭐ Término prioritario '{termino}': Clip generado (cualquier mención es relevante)")
-                                    idea_general_clip = f"Mención del término '{termino}': {transcripcion_segmento[:200]}..."
+                                # Ajustar para que quepa dentro del video
+                                if duracion_clip_real <= duracion_video:
+                                    # Mover el inicio hacia atrás
+                                    inicio = max(0, duracion_video - duracion_clip_real)
+                                    fin_clip = duracion_video
                                 else:
-                                    st.warning(f"⚠️ Clip descartado (Relevancia: {relevancia_gemini}): {contexto_gemini or idea_general_clip[:100]}")
-                                    log_info(f"⏭️ Clip descartado por falta de contexto relevante: {termino}", func_name)
-                                    razon_ia = f"Relevancia baja ({relevancia_gemini})"
-                                    det = (contexto_gemini or idea_general_clip or "").strip()
-                                    if det:
-                                        razon_ia = f"{razon_ia}. {det}"
-                                    ctx_drive = (
-                                        f"Motivo (relevancia del segmento):\n{razon_ia}\n\n"
-                                        f"Transcripción del segmento analizado:\n{(transcripcion_segmento or '')[:12000]}"
-                                    )
-                                    _destino_video_check, _txt_video_check, estado_videoscheck = guardar_video_y_minuto_coincidencia(
-                                        video_path=archivo_path,
-                                        minuto_detectado=momento_termino,
-                                        termino_detectado=termino,
-                                        mover_video=False,
-                                        prefijo_carpeta="_tangencial_"
-                                    )
-                                    drive_url = ""
-                                    if estado_videoscheck in ("copiado", "movido", "ya_existia"):
-                                        st.info(f"📁 videoscheck ({estado_videoscheck}): `{_destino_video_check}`")
-                                        _ok_gd_t, _msg_gd_t, drive_url = subir_tangencial_videoscheck_a_google_drive(
-                                            obtener_cliente_por_termino(termino),
-                                            _destino_video_check,
-                                            _txt_video_check,
-                                            ctx_drive,
-                                        )
-                                        if _ok_gd_t:
-                                            st.info(f"☁️ Drive (tangenciales): {_msg_gd_t}")
-                                    else:
-                                        log_warning(f"⚠️ No se pudo enviar a videoscheck (baja relevancia): {estado_videoscheck}", func_name)
-                                    te_rel = (transcripcion_segmento or "").strip()[:12000]
-                                    _item_tang = crear_item_tangencial(
-                                            rel,
-                                            termino,
-                                            razon_ia,
-                                            momento_termino,
-                                            texto_evidencia=te_rel,
-                                            url_drive_video=drive_url or "",
-                                            transcripcion_extracto=(transcripcion_segmento or "")[:2500],
-                                        )
-                                    menciones_tangenciales_data.append(_item_tang)
-                                    try:
-                                        enriquecer_motivos_tangenciales_deepseek(
-                                            [_item_tang], func_name=func_name
-                                        )
-                                    except Exception as e_enr:
-                                        log_warning(
-                                            f"⚠️ DeepSeek tangencial (previo Brevo inmediato) omitido: {e_enr}",
-                                            func_name,
-                                        )
-                                    _cli_tang = obtener_cliente_por_termino(termino)
-                                    notificar_brevo_tangencial_inmediato_si(_cli_tang, _item_tang, func_name)
-                                    notificar_google_sheets_tangencial_inmediato_si(_cli_tang, _item_tang, func_name)
-                                    
-                                    # Eliminar el clip generado
-                                    if os.path.exists(clip_path):
-                                        os.remove(clip_path)
-                                        log_info(f"🗑️ Clip eliminado (no relevante): {clip_path}", func_name)
-                                    
-                                    continue  # Saltar al siguiente término
+                                    # Video más corto que duración deseada
+                                    inicio = 0
+                                    fin_clip = duracion_video
+                                    duracion_clip_real = duracion_video
                             
-                            st.success(f"✅ Idea extraída: {idea_general_clip[:150]}...")
+                                log_info(f"  - Segmento ajustado: {inicio:.2f}s - {fin_clip:.2f}s ({duracion_clip_real:.2f}s)", func_name)
+                    
                         except Exception as e:
-                            log_warning(f"⚠️ Error extrayendo idea general: {e}", func_name)
-                            idea_general_clip = transcripcion_segmento[:300] + "..."  # Fallback
+                            log_warning(f"⚠️ No se pudo obtener duración del video: {e}", func_name)
+                            log_info("  - Continuando con el clip asumiendo que hay suficiente duración", func_name)
+                
+                        # Generar clip de video MP4
+                        clip_name = f"{ts}_{termino}_{m}m{s:02d}s.mp4"
+                        clip_path = os.path.join(clip_dir, clip_name)
+                        _clip_disk_path = clip_path
+                
+                        # Calcular información del clip
+                        buffer_anterior_real = momento_termino - inicio
+                        buffer_posterior_real = fin_clip - momento_termino
+                
+                        st.success(f"🎬 Generando clip inteligente de {duracion_clip_real:.1f}s para '{termino}'")
+                        st.info(f"📊 Segmento: {inicio:.1f}s - {fin_clip:.1f}s | Antes: {buffer_anterior_real:.1f}s | Después: {buffer_posterior_real:.1f}s")
+                        st.info(f"💡 {razon_segmento}")
                     
-                        # VERIFICACIÓN POST-GENERACIÓN: Confirmar que el clip contiene el término
-                        # Para términos prioritarios, esta verificación es opcional (más tolerante)
-                        if not es_prioritario:
-                            st.info(f"🔍 Verificando que el clip generado contenga el término '{termino}'...")
-                        else:
-                            st.info(f"⭐ Término prioritario '{termino}': Verificación opcional")
-                    
-                        # Extraer audio del clip para verificación
-                        clip_audio_path = clip_path.replace(".mp4", "_verify.wav")
-                        _ffv = _ruta_ejecutable_ffmpeg()
-                        if not _ffv:
-                            raise RuntimeError("ffmpeg no encontrado")
-                        verify_cmd = [
-                            _ffv,
+                        # Comando para recortar video con duración exacta determinada por GPT-4o
+                        _ffcut = _ruta_ejecutable_ffmpeg()
+                        if not _ffcut:
+                            raise RuntimeError("ffmpeg no encontrado; no se puede generar el clip.")
+                        cmd = [
+                            _ffcut,
                             "-y",
+                            "-ss",
+                            str(inicio),
+                            "-t",
+                            str(duracion_clip_real),
                             "-i",
+                            archivo_path,
+                            "-c:v",
+                            "libx264",
+                            "-c:a",
+                            "aac",
                             clip_path,
-                            "-ac",
-                            "1",
-                            "-ar",
-                            "16000",
-                            "-f",
-                            "wav",
-                            clip_audio_path,
                         ]
-                    
+                
                         try:
                             subprocess.run(
-                                verify_cmd,
+                                cmd,
                                 check=True,
                                 stdout=subprocess.DEVNULL,
                                 stderr=subprocess.DEVNULL,
                                 **_subprocess_no_window_kw(),
                             )
+                    
+                            # ========== 🤖 EXTRAER IDEA GENERAL DEL SEGMENTO CON GPT-4o ==========
+                            st.info(f"🤖 Extrayendo idea general del segmento con GPT-4o...")
                         
-                            # Transcribir el clip para verificar
-                            verificacion_transcripcion, _, _ = transcribir_audio_hibrido(clip_audio_path)
-                            verificacion_lower = verificacion_transcripcion.lower()
+                            # Extraer transcripción solo del segmento del clip
+                            transcripcion_segmento = ""
+                            for seg in segments_timestamps:
+                                # Si el segmento está dentro del rango del clip
+                                if seg['start'] >= inicio and seg['start'] <= fin_clip:
+                                    transcripcion_segmento += seg['text'] + " "
                         
-                            # Verificar si el término está presente en el clip
-                            clip_encontrado, clip_termino_encontrado = buscar_termino_flexible(termino, verificacion_lower)
-                            if clip_encontrado:
-                                st.success(f"✅ VERIFICADO: El término '{termino}' (variante: '{clip_termino_encontrado}') está presente en el clip generado")
-                                log_info(f"✅ Término '{termino}' verificado en clip: {verificacion_transcripcion[:100]}...", func_name)
-                            else:
-                                if es_prioritario:
-                                    # Para términos prioritarios, mantener el clip aunque no se verifique en la revisión
-                                    st.warning(f"⚠️ Término prioritario '{termino}': No verificado en clip pero se mantiene")
-                                    log_info(f"⭐ TÉRMINO PRIORITARIO '{termino}': Clip mantenido sin verificación estricta", func_name)
+                            # Si no se encontró transcripción del segmento, usar contexto completo
+                            if not transcripcion_segmento.strip():
+                                transcripcion_segmento = mejor_texto_contexto
+                        
+                            # Llamar a GEMINI 3.0 para extraer idea general (con fallback a GPT-4o)
+                            try:
+                                # Usar Gemini 3.0 como modelo principal
+                                resultado_gemini = extraer_idea_general_segmento_gemini(
+                                    transcripcion_segmento=transcripcion_segmento.strip(),
+                                    termino_encontrado=termino,
+                                    duracion_segundos=duracion_clip_real,
+                                    nombre_video=rel
+                                )
+                            
+                                # Extraer la idea general del resultado estructurado
+                                idea_general_clip = resultado_gemini.get('idea_general', transcripcion_segmento[:600])
+                                relevancia_gemini = resultado_gemini.get('relevancia', 'media')
+                                es_relevante_gemini = resultado_gemini.get('es_relevante', True)
+                                tema_principal = resultado_gemini.get('tema_principal', termino)
+                                contexto_gemini = resultado_gemini.get('contexto', '')
+                            
+                                log_info(f"✅ Análisis Gemini 3.0 - Relevancia: {relevancia_gemini}, Tema: {tema_principal}", func_name)
+                                log_info(f"📝 Idea general: {idea_general_clip[:100]}...", func_name)
+                            
+                                # ========== VERIFICACIÓN DE RELEVANCIA CON GEMINI ==========
+                                # Si Gemini determinó que la mención no es relevante, descartar el clip
+                                # EXCEPCIÓN: NO descartar clips de términos prioritarios
+                                if not es_relevante_gemini or relevancia_gemini == 'baja':
+                                    if es_prioritario:
+                                        # Para términos prioritarios, mantener el clip aunque Gemini lo considere no relevante
+                                        log_info(f"⭐ TÉRMINO PRIORITARIO '{termino}': Clip mantenido a pesar de evaluación de relevancia", func_name)
+                                        st.info(f"⭐ Término prioritario '{termino}': Clip generado (cualquier mención es relevante)")
+                                        idea_general_clip = f"Mención del término '{termino}': {transcripcion_segmento[:200]}..."
+                                    else:
+                                        st.warning(f"⚠️ Clip descartado (Relevancia: {relevancia_gemini}): {contexto_gemini or idea_general_clip[:100]}")
+                                        log_info(f"⏭️ Clip descartado por falta de contexto relevante: {termino}", func_name)
+                                        razon_ia = f"Relevancia baja ({relevancia_gemini})"
+                                        det = (contexto_gemini or idea_general_clip or "").strip()
+                                        if det:
+                                            razon_ia = f"{razon_ia}. {det}"
+                                        ctx_drive = (
+                                            f"Motivo (relevancia del segmento):\n{razon_ia}\n\n"
+                                            f"Transcripción del segmento analizado:\n{(transcripcion_segmento or '')[:12000]}"
+                                        )
+                                        _destino_video_check, _txt_video_check, estado_videoscheck = guardar_video_y_minuto_coincidencia(
+                                            video_path=archivo_path,
+                                            minuto_detectado=momento_termino,
+                                            termino_detectado=termino,
+                                            mover_video=False,
+                                            prefijo_carpeta="_tangencial_"
+                                        )
+                                        drive_url = ""
+                                        if estado_videoscheck in ("copiado", "movido", "ya_existia"):
+                                            st.info(f"📁 videoscheck ({estado_videoscheck}): `{_destino_video_check}`")
+                                            _ok_gd_t, _msg_gd_t, drive_url = subir_tangencial_videoscheck_a_google_drive(
+                                                obtener_cliente_por_termino(termino),
+                                                _destino_video_check,
+                                                _txt_video_check,
+                                                ctx_drive,
+                                            )
+                                            if _ok_gd_t:
+                                                st.info(f"☁️ Drive (tangenciales): {_msg_gd_t}")
+                                        else:
+                                            log_warning(f"⚠️ No se pudo enviar a videoscheck (baja relevancia): {estado_videoscheck}", func_name)
+                                        te_rel = (transcripcion_segmento or "").strip()[:12000]
+                                        _item_tang = crear_item_tangencial(
+                                                rel,
+                                                termino,
+                                                razon_ia,
+                                                momento_termino,
+                                                texto_evidencia=te_rel,
+                                                url_drive_video=drive_url or "",
+                                                transcripcion_extracto=(transcripcion_segmento or "")[:2500],
+                                            )
+                                        menciones_tangenciales_data.append(_item_tang)
+                                        try:
+                                            enriquecer_motivos_tangenciales_deepseek(
+                                                [_item_tang], func_name=func_name
+                                            )
+                                        except Exception as e_enr:
+                                            log_warning(
+                                                f"⚠️ DeepSeek tangencial (previo Brevo inmediato) omitido: {e_enr}",
+                                                func_name,
+                                            )
+                                        _cli_tang = obtener_cliente_por_termino(termino)
+                                        notificar_brevo_tangencial_inmediato_si(_cli_tang, _item_tang, func_name)
+                                        notificar_google_sheets_tangencial_inmediato_si(_cli_tang, _item_tang, func_name)
                                     
-                                    # Limpiar archivo de verificación pero CONTINUAR con el clip
-                                    if os.path.exists(clip_audio_path):
-                                        os.remove(clip_audio_path)
-                                else:
-                                    st.error(f"❌ ERROR: El término '{termino}' NO está presente en el clip generado")
-                                    log_warning(f"❌ Término '{termino}' NO verificado en clip. Transcripción: {verificacion_transcripcion[:100]}...", func_name)
-                                
-                                    # Eliminar el clip defectuoso
-                                    if os.path.exists(clip_path):
-                                        os.remove(clip_path)
-                                        st.warning(f"🗑️ Clip defectuoso eliminado: {clip_name}")
-                                        log_warning(f"Clip defectuoso eliminado: {clip_path}", func_name)
+                                        # Eliminar el clip generado
+                                        if os.path.exists(clip_path):
+                                            os.remove(clip_path)
+                                            log_info(f"🗑️ Clip eliminado (no relevante): {clip_path}", func_name)
+                                    
+                                        continue  # Saltar al siguiente término
                             
-                                    # Limpiar archivo de verificación
-                                    if os.path.exists(clip_audio_path):
-                                        os.remove(clip_audio_path)
-                            
-                                    continue  # No agregar a la lista ni enviar
-                        
-                            # Limpiar archivo de verificación
-                            if os.path.exists(clip_audio_path):
-                                os.remove(clip_audio_path)
-                            
-                        except Exception as verify_error:
-                            st.warning(f"⚠️ No se pudo verificar el clip (continuando): {verify_error}")
-                            log_warning(f"Error en verificación de clip: {verify_error}", func_name)
-
-                        # === INTRO: logo del canal + voz Mistral (antes de subidas/envío) ===
-                        try:
-                            _intro_on = st.session_state.get("intro_clip_enabled", INTRO_CLIP_ENABLED)
-                            clip_path, _ok_intro, _msg_intro = prefijar_intro_coincidencia_si(
+                                st.success(f"✅ Idea extraída: {idea_general_clip[:150]}...")
+                            except Exception as e:
+                                log_warning(f"⚠️ Error extrayendo idea general: {e}", func_name)
+                                idea_general_clip = transcripcion_segmento[:300] + "..."  # Fallback
+                    
+                            # VERIFICACIÓN POST-GENERACIÓN: Confirmar que el clip contiene el término
+                            # Para términos prioritarios, esta verificación es opcional (más tolerante)
+                            if not es_prioritario:
+                                st.info(f"🔍 Verificando que el clip generado contenga el término '{termino}'...")
+                            else:
+                                st.info(f"⭐ Término prioritario '{termino}': Verificación opcional")
+                    
+                            # Extraer audio del clip para verificación
+                            clip_audio_path = clip_path.replace(".mp4", "_verify.wav")
+                            _ffv = _ruta_ejecutable_ffmpeg()
+                            if not _ffv:
+                                raise RuntimeError("ffmpeg no encontrado")
+                            verify_cmd = [
+                                _ffv,
+                                "-y",
+                                "-i",
                                 clip_path,
-                                termino,
-                                rel,
-                                mistral_api_key=mistral_api_key,
-                                enabled=_intro_on,
-                                log_fn=lambda m, lvl="info": (
-                                    log_warning(m, func_name) if lvl == "warning" else log_info(m, func_name)
-                                ),
-                                ui_info=st.info,
-                                ui_warning=st.warning,
-                            )
-                        except Exception as e_intro:
-                            log_warning(f"Intro clip omitida por error: {e_intro}", func_name)
+                                "-ac",
+                                "1",
+                                "-ar",
+                                "16000",
+                                "-f",
+                                "wav",
+                                clip_audio_path,
+                            ]
                     
-                        # SUBIR CLIP A CLOUDINARY INMEDIATAMENTE
-                        url_cloudinary_clip = None
-                        with st.spinner("☁️ Subiendo clip a Cloudinary..."):
                             try:
-                                cloudinary_configurado = configurar_cloudinary()
-                                if cloudinary_configurado:
-                                    video_url_cloudinary, mensaje_cloudinary = subir_video_cloudinary(clip_path, termino)
-                                    if video_url_cloudinary:
-                                        url_cloudinary_clip = video_url_cloudinary
-                                        st.success(f"☁️ ✅ **CLIP subido a Cloudinary**: {video_url_cloudinary}")
-                                        log_info(f"Clip subido a Cloudinary: {video_url_cloudinary}", func_name)
-                                    else:
-                                        st.warning(f"⚠️ Error subiendo clip a Cloudinary: {mensaje_cloudinary}")
-                                        log_warning(f"Error subiendo clip a Cloudinary: {mensaje_cloudinary}", func_name)
+                                subprocess.run(
+                                    verify_cmd,
+                                    check=True,
+                                    stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL,
+                                    **_subprocess_no_window_kw(),
+                                )
+                        
+                                # Transcribir el clip para verificar
+                                verificacion_transcripcion, _, _ = transcribir_audio_hibrido(clip_audio_path)
+                                verificacion_lower = verificacion_transcripcion.lower()
+                        
+                                # Verificar si el término está presente en el clip
+                                clip_encontrado, clip_termino_encontrado = buscar_termino_flexible(termino, verificacion_lower)
+                                if clip_encontrado:
+                                    st.success(f"✅ VERIFICADO: El término '{termino}' (variante: '{clip_termino_encontrado}') está presente en el clip generado")
+                                    log_info(f"✅ Término '{termino}' verificado en clip: {verificacion_transcripcion[:100]}...", func_name)
                                 else:
-                                    st.warning("⚠️ Cloudinary no está configurado")
-                                    log_warning("Cloudinary no está configurado para subir clip", func_name)
-                            except Exception as e:
-                                st.warning(f"⚠️ Error subiendo clip a Cloudinary: {str(e)}")
-                                log_warning(f"Error subiendo clip a Cloudinary: {str(e)}", func_name)
-                        
-                        url_bunny_clip = None
-                        with st.spinner("🐰 Subiendo clip a Bunny Storage..."):
-                            try:
-                                if cargar_bunny_config().get('enabled'):
-                                    u_b, msg_b = subir_video_bunny(clip_path, termino, "")
-                                    if u_b:
-                                        url_bunny_clip = u_b
-                                        st.success(f"🐰 ✅ **CLIP subido a Bunny**: {u_b}")
-                                        log_info(f"Clip subido a Bunny: {u_b}", func_name)
+                                    if es_prioritario:
+                                        # Para términos prioritarios, mantener el clip aunque no se verifique en la revisión
+                                        st.warning(f"⚠️ Término prioritario '{termino}': No verificado en clip pero se mantiene")
+                                        log_info(f"⭐ TÉRMINO PRIORITARIO '{termino}': Clip mantenido sin verificación estricta", func_name)
+                                    
+                                        # Limpiar archivo de verificación pero CONTINUAR con el clip
+                                        if os.path.exists(clip_audio_path):
+                                            os.remove(clip_audio_path)
                                     else:
-                                        st.warning(f"⚠️ Error subiendo clip a Bunny: {msg_b}")
-                                        log_warning(f"Error subiendo clip a Bunny: {msg_b}", func_name)
-                            except Exception as e:
-                                st.warning(f"⚠️ Error subiendo clip a Bunny: {str(e)}")
-                                log_warning(f"Error subiendo clip a Bunny: {str(e)}", func_name)
+                                        st.error(f"❌ ERROR: El término '{termino}' NO está presente en el clip generado")
+                                        log_warning(f"❌ Término '{termino}' NO verificado en clip. Transcripción: {verificacion_transcripcion[:100]}...", func_name)
+                                
+                                        # Eliminar el clip defectuoso
+                                        if os.path.exists(clip_path):
+                                            os.remove(clip_path)
+                                            st.warning(f"🗑️ Clip defectuoso eliminado: {clip_name}")
+                                            log_warning(f"Clip defectuoso eliminado: {clip_path}", func_name)
+                            
+                                        # Limpiar archivo de verificación
+                                        if os.path.exists(clip_audio_path):
+                                            os.remove(clip_audio_path)
+                            
+                                        continue  # No agregar a la lista ni enviar
                         
-                        url_r2_clip = None
-                        _cli_clip = obtener_cliente_por_termino(termino)
-                        with st.spinner("☁️ Subiendo clip a Cloudflare R2..."):
+                                # Limpiar archivo de verificación
+                                if os.path.exists(clip_audio_path):
+                                    os.remove(clip_audio_path)
+                            
+                            except Exception as verify_error:
+                                st.warning(f"⚠️ No se pudo verificar el clip (continuando): {verify_error}")
+                                log_warning(f"Error en verificación de clip: {verify_error}", func_name)
+
+                            # === INTRO: logo del canal + voz Mistral (antes de subidas/envío) ===
                             try:
-                                if clip_path and os.path.exists(clip_path) and _cliente_debe_subir_r2(_cli_clip):
-                                    u_r2, msg_r2 = subir_video_r2(
-                                        clip_path,
-                                        termino,
-                                        timestamp=timestamp_actual,
-                                        r2_cfg=(_cli_clip.get("r2") or {}),
-                                    )
-                                    if u_r2:
-                                        url_r2_clip = u_r2
-                                        st.success(f"☁️ ✅ **CLIP subido a Cloudflare R2**: {u_r2}")
-                                        log_info(f"Clip subido a Cloudflare R2: {u_r2}", func_name)
-                                    else:
-                                        st.warning(f"⚠️ Error subiendo clip a R2: {msg_r2}")
-                                        log_warning(f"Error subiendo clip a R2: {msg_r2}", func_name)
-                            except Exception as e:
-                                st.warning(f"⚠️ Error subiendo clip a R2: {str(e)}")
-                                log_warning(f"Error subiendo clip a R2: {str(e)}", func_name)
-                        
-                        # Agregar a la lista de clips generados SOLO si pasó la verificación
-                        clips_generados_en_sesion.append({
-                            'path': clip_path,
-                            'termino': termino,
-                            'tiempo': f"{m}m{s:02d}s",
-                            'contexto': mejor_texto_contexto,
-                            'archivo_origen': rel,
-                            'momento_exacto': momento_termino,
-                            'verificado': True,
-                            'url_cloudinary': url_cloudinary_clip,  # URL de Cloudinary
-                            'url_bunny': url_bunny_clip,
-                            'url_r2': url_r2_clip,
-                        })
-                        st.session_state.clips_generados += 1
+                                _intro_on = st.session_state.get("intro_clip_enabled", INTRO_CLIP_ENABLED)
+                                clip_path, _ok_intro, _msg_intro = prefijar_intro_coincidencia_si(
+                                    clip_path,
+                                    termino,
+                                    rel,
+                                    mistral_api_key=mistral_api_key,
+                                    enabled=_intro_on,
+                                    log_fn=lambda m, lvl="info": (
+                                        log_warning(m, func_name) if lvl == "warning" else log_info(m, func_name)
+                                    ),
+                                    ui_info=st.info,
+                                    ui_warning=st.warning,
+                                )
+                            except Exception as e_intro:
+                                log_warning(f"Intro clip omitida por error: {e_intro}", func_name)
                     
-                        # 🚀 ENVÍO INMEDIATO DE COINCIDENCIA
-                        st.info(f"🚀 Enviando coincidencia inmediata para '{termino}'...")
+                            # SUBIR CLIP A CLOUDINARY INMEDIATAMENTE
+                            url_cloudinary_clip = None
+                            with st.spinner("☁️ Subiendo clip a Cloudinary..."):
+                                try:
+                                    cloudinary_configurado = configurar_cloudinary()
+                                    if cloudinary_configurado:
+                                        video_url_cloudinary, mensaje_cloudinary = subir_video_cloudinary(clip_path, termino)
+                                        if video_url_cloudinary:
+                                            url_cloudinary_clip = video_url_cloudinary
+                                            st.success(f"☁️ ✅ **CLIP subido a Cloudinary**: {video_url_cloudinary}")
+                                            log_info(f"Clip subido a Cloudinary: {video_url_cloudinary}", func_name)
+                                        else:
+                                            st.warning(f"⚠️ Error subiendo clip a Cloudinary: {mensaje_cloudinary}")
+                                            log_warning(f"Error subiendo clip a Cloudinary: {mensaje_cloudinary}", func_name)
+                                    else:
+                                        st.warning("⚠️ Cloudinary no está configurado")
+                                        log_warning("Cloudinary no está configurado para subir clip", func_name)
+                                except Exception as e:
+                                    st.warning(f"⚠️ Error subiendo clip a Cloudinary: {str(e)}")
+                                    log_warning(f"Error subiendo clip a Cloudinary: {str(e)}", func_name)
                         
-                        # Log de la coincidencia detectada para evitar duplicados
-                        try:
-                            coincidencias_logger.coincidencias_logger.info(
-                                f"🎯 COINCIDENCIA DETECTADA | Video: {rel} | Término: {termino} | Timestamp: {timestamp_actual:.1f}s | Duración: 0s | Confianza: N/A"
-                            )
-                        except Exception as e:
-                            log_warning(f"Error registrando coincidencia en log: {e}", func_name)
+                            url_bunny_clip = None
+                            with st.spinner("🐰 Subiendo clip a Bunny Storage..."):
+                                try:
+                                    if cargar_bunny_config().get('enabled'):
+                                        u_b, msg_b = subir_video_bunny(clip_path, termino, "")
+                                        if u_b:
+                                            url_bunny_clip = u_b
+                                            st.success(f"🐰 ✅ **CLIP subido a Bunny**: {u_b}")
+                                            log_info(f"Clip subido a Bunny: {u_b}", func_name)
+                                        else:
+                                            st.warning(f"⚠️ Error subiendo clip a Bunny: {msg_b}")
+                                            log_warning(f"Error subiendo clip a Bunny: {msg_b}", func_name)
+                                except Exception as e:
+                                    st.warning(f"⚠️ Error subiendo clip a Bunny: {str(e)}")
+                                    log_warning(f"Error subiendo clip a Bunny: {str(e)}", func_name)
                         
-                        # 📋 CONSTRUIR RESUMEN EJECUTIVO ESTRUCTURADO COMPLETO
-                        # Usar todos los campos de Gemini para el formato completo
-                        try:
-                            _tiene_gemini = 'resultado_gemini' in locals() and isinstance(resultado_gemini, dict)
-                            _tema = resultado_gemini.get('tema_principal', termino) if _tiene_gemini else termino
-                            _contexto_g = resultado_gemini.get('contexto', '') if _tiene_gemini else ''
-                            _que_dice = resultado_gemini.get('que_se_dice', '') if _tiene_gemini else ''
-                            _relevancia_g = resultado_gemini.get('relevancia', 'media') if _tiene_gemini else 'media'
-                        except:
-                            _tema = termino
-                            _contexto_g = ''
-                            _que_dice = ''
-                            _relevancia_g = 'media'
+                            url_r2_clip = None
+                            _cli_clip = obtener_cliente_por_termino(termino)
+                            with st.spinner("☁️ Subiendo clip a Cloudflare R2..."):
+                                try:
+                                    if clip_path and os.path.exists(clip_path) and _cliente_debe_subir_r2(_cli_clip):
+                                        u_r2, msg_r2 = subir_video_r2(
+                                            clip_path,
+                                            termino,
+                                            timestamp=timestamp_actual,
+                                            r2_cfg=(_cli_clip.get("r2") or {}),
+                                        )
+                                        if u_r2:
+                                            url_r2_clip = u_r2
+                                            st.success(f"☁️ ✅ **CLIP subido a Cloudflare R2**: {u_r2}")
+                                            log_info(f"Clip subido a Cloudflare R2: {u_r2}", func_name)
+                                        else:
+                                            st.warning(f"⚠️ Error subiendo clip a R2: {msg_r2}")
+                                            log_warning(f"Error subiendo clip a R2: {msg_r2}", func_name)
+                                except Exception as e:
+                                    st.warning(f"⚠️ Error subiendo clip a R2: {str(e)}")
+                                    log_warning(f"Error subiendo clip a R2: {str(e)}", func_name)
                         
-                        resumen_estructurado = f"Tema principal: {_tema}\n\n"
-                        if _contexto_g:
-                            resumen_estructurado += f"Contexto: {_contexto_g}\n\n"
-                        if _que_dice:
-                            resumen_estructurado += f"Puntos clave: {_que_dice}\n\n"
-                        # Relevancia: solo texto legible; nunca JSON crudo (evitar "esrelevante: true, relevancia:")
-                        _relevancia_texto = (_relevancia_g or "media").capitalize()
-                        if idea_general_clip and idea_general_clip != _que_dice:
-                            _es_json = any(x in (idea_general_clip or "").lower() for x in ("es_relevante", "esrelevante", '"relevancia"', "relevancia:", "true,", "false,"))
-                            if not _es_json and len((idea_general_clip or "").strip()) > 0:
-                                resumen_estructurado += f"Relevancia: {_relevancia_texto} — {idea_general_clip.strip()}"
+                            # Agregar a la lista de clips generados SOLO si pasó la verificación
+                            clips_generados_en_sesion.append({
+                                'path': clip_path,
+                                'termino': termino,
+                                'tiempo': f"{m}m{s:02d}s",
+                                'contexto': mejor_texto_contexto,
+                                'archivo_origen': rel,
+                                'momento_exacto': momento_termino,
+                                'verificado': True,
+                                'url_cloudinary': url_cloudinary_clip,  # URL de Cloudinary
+                                'url_bunny': url_bunny_clip,
+                                'url_r2': url_r2_clip,
+                            })
+                            st.session_state.clips_generados += 1
+                    
+                            # 🚀 ENVÍO INMEDIATO DE COINCIDENCIA
+                            st.info(f"🚀 Enviando coincidencia inmediata para '{termino}'...")
+                        
+                            # Log de la coincidencia detectada para evitar duplicados
+                            try:
+                                coincidencias_logger.coincidencias_logger.info(
+                                    f"🎯 COINCIDENCIA DETECTADA | Video: {rel} | Término: {termino} | Timestamp: {timestamp_actual:.1f}s | Duración: 0s | Confianza: N/A"
+                                )
+                            except Exception as e:
+                                log_warning(f"Error registrando coincidencia en log: {e}", func_name)
+                        
+                            # 📋 CONSTRUIR RESUMEN EJECUTIVO ESTRUCTURADO COMPLETO
+                            # Usar todos los campos de Gemini para el formato completo
+                            try:
+                                _tiene_gemini = 'resultado_gemini' in locals() and isinstance(resultado_gemini, dict)
+                                _tema = resultado_gemini.get('tema_principal', termino) if _tiene_gemini else termino
+                                _contexto_g = resultado_gemini.get('contexto', '') if _tiene_gemini else ''
+                                _que_dice = resultado_gemini.get('que_se_dice', '') if _tiene_gemini else ''
+                                _relevancia_g = resultado_gemini.get('relevancia', 'media') if _tiene_gemini else 'media'
+                            except:
+                                _tema = termino
+                                _contexto_g = ''
+                                _que_dice = ''
+                                _relevancia_g = 'media'
+                        
+                            resumen_estructurado = f"Tema principal: {_tema}\n\n"
+                            if _contexto_g:
+                                resumen_estructurado += f"Contexto: {_contexto_g}\n\n"
+                            if _que_dice:
+                                resumen_estructurado += f"Puntos clave: {_que_dice}\n\n"
+                            # Relevancia: solo texto legible; nunca JSON crudo (evitar "esrelevante: true, relevancia:")
+                            _relevancia_texto = (_relevancia_g or "media").capitalize()
+                            if idea_general_clip and idea_general_clip != _que_dice:
+                                _es_json = any(x in (idea_general_clip or "").lower() for x in ("es_relevante", "esrelevante", '"relevancia"', "relevancia:", "true,", "false,"))
+                                if not _es_json and len((idea_general_clip or "").strip()) > 0:
+                                    resumen_estructurado += f"Relevancia: {_relevancia_texto} — {idea_general_clip.strip()}"
+                                else:
+                                    resumen_estructurado += f"Relevancia: {_relevancia_texto}"
                             else:
                                 resumen_estructurado += f"Relevancia: {_relevancia_texto}"
-                        else:
-                            resumen_estructurado += f"Relevancia: {_relevancia_texto}"
                         
-                        # === GUARDIA: Verificar duración mínima del clip (90s) antes de enviar ===
-                        # El usuario es estricto: "no quiero videos de menos de 90"
-                        MIN_DURACION_CLIP_ENVIO = 90  # segundos (restaurado a 90)
-                        _clip_ok_para_enviar = True
-                        if clip_path and os.path.exists(clip_path):
-                            try:
-                                _pro_clip = _ruta_ejecutable_ffprobe()
-                                if _pro_clip and os.path.isfile(clip_path):
-                                    _clip_abs = os.path.abspath(clip_path)
-                                    _cmd_dur = [
-                                        _pro_clip,
-                                        "-v",
-                                        "quiet",
-                                        "-show_entries",
-                                        "format=duration",
-                                        "-of",
-                                        "csv=p=0",
-                                        "-i",
-                                        _clip_abs,
-                                    ]
-                                    _res_dur = subprocess.run(
-                                        _cmd_dur,
-                                        capture_output=True,
-                                        text=True,
-                                        **_subprocess_no_window_kw(),
-                                    )
-                                    if _res_dur.returncode == 0 and (_res_dur.stdout or "").strip():
-                                        _dur_clip = float(_res_dur.stdout.strip())
-                                        if _dur_clip < MIN_DURACION_CLIP_ENVIO:
-                                            log_warning(
-                                                f"⚠️ Clip descartado por requerimiento de usuario: duración {_dur_clip:.1f}s < {MIN_DURACION_CLIP_ENVIO}s",
-                                                func_name,
-                                            )
-                                            st.warning(
-                                                f"⚠️ Video descartado por ser menor a {MIN_DURACION_CLIP_ENVIO}s (según tu requerimiento). "
-                                                "Telegram y correo llevarán solo el **resumen de texto**, sin adjunto de clip."
-                                            )
-                                            log_info(
-                                                "Envío: solo texto (sin video) porque el clip es < "
-                                                f"{MIN_DURACION_CLIP_ENVIO}s — término seguirá notificándose por texto.",
-                                                func_name,
-                                            )
-                                            clip_path = None  # No enviar video pero sí el texto
-                                            _clip_ok_para_enviar = False
-                            except Exception as _e_dur:
-                                log_warning(f"⚠️ No se pudo verificar duración del clip: {_e_dur}", func_name)
+                            # === GUARDIA: Verificar duración mínima del clip (90s) antes de enviar ===
+                            # El usuario es estricto: "no quiero videos de menos de 90"
+                            MIN_DURACION_CLIP_ENVIO = 90  # segundos (restaurado a 90)
+                            _clip_ok_para_enviar = True
+                            if clip_path and os.path.exists(clip_path):
+                                try:
+                                    _pro_clip = _ruta_ejecutable_ffprobe()
+                                    if _pro_clip and os.path.isfile(clip_path):
+                                        _clip_abs = os.path.abspath(clip_path)
+                                        _cmd_dur = [
+                                            _pro_clip,
+                                            "-v",
+                                            "quiet",
+                                            "-show_entries",
+                                            "format=duration",
+                                            "-of",
+                                            "csv=p=0",
+                                            "-i",
+                                            _clip_abs,
+                                        ]
+                                        _res_dur = subprocess.run(
+                                            _cmd_dur,
+                                            capture_output=True,
+                                            text=True,
+                                            **_subprocess_no_window_kw(),
+                                        )
+                                        if _res_dur.returncode == 0 and (_res_dur.stdout or "").strip():
+                                            _dur_clip = float(_res_dur.stdout.strip())
+                                            if _dur_clip < MIN_DURACION_CLIP_ENVIO:
+                                                log_warning(
+                                                    f"⚠️ Clip descartado por requerimiento de usuario: duración {_dur_clip:.1f}s < {MIN_DURACION_CLIP_ENVIO}s",
+                                                    func_name,
+                                                )
+                                                st.warning(
+                                                    f"⚠️ Video descartado por ser menor a {MIN_DURACION_CLIP_ENVIO}s (según tu requerimiento). "
+                                                    "Telegram y correo llevarán solo el **resumen de texto**, sin adjunto de clip."
+                                                )
+                                                log_info(
+                                                    "Envío: solo texto (sin video) porque el clip es < "
+                                                    f"{MIN_DURACION_CLIP_ENVIO}s — término seguirá notificándose por texto.",
+                                                    func_name,
+                                                )
+                                                clip_path = None  # No enviar video pero sí el texto
+                                                _clip_ok_para_enviar = False
+                                except Exception as _e_dur:
+                                    log_warning(f"⚠️ No se pudo verificar duración del clip: {_e_dur}", func_name)
 
-                        exito_envio, mensaje_envio, url_cloudinary_clip, url_r2_clip = enviar_coincidencia_inmediata(
-                            rel,  # nombre del archivo
-                            termino,  # término encontrado
-                            mejor_texto_contexto,  # contexto del término
-                            tipo_archivo,  # tipo de archivo
-                            clip_path,  # ruta del clip
-                            transcripcion_mistral,  # transcripción completa
-                            timestamp_actual,  # timestamp para control de duplicados
-                            resumen_estructurado,  # 📋 RESUMEN EJECUTIVO ESTRUCTURADO COMPLETO
-                            video_url=url_cloudinary_clip, # URL de Cloudinary
-                            video_url_bunny=url_bunny_clip,
-                            transcripcion_segmento=transcripcion_segmento, # Segmento resaltado
-                            video_url_r2_precargada=url_r2_clip,
-                        )
-                    
-                        if exito_envio:
-                            st.success(f"✅ Coincidencia enviada inmediatamente: {mensaje_envio}")
-                            log_info(f"✅ Coincidencia enviada exitosamente: {termino} en {rel}", func_name)
-                        else:
-                            st.warning(f"⚠️ Error enviando coincidencia inmediata: {mensaje_envio}")
-                            log_warning(f"❌ Error enviando coincidencia: {mensaje_envio}", func_name)
-                    
-                    except Exception as e:
-                        st.warning(f"⚠️ Error generando clip para {termino}: {e}")
-                        continue
-
-                    # Guardar transcripción en archivo TXT (ruta física del .mp4, aunque no se adjunte en envíos)
-                    txt_path = _clip_disk_path.replace(".mp4", ".txt")
-                    
-                    buffer_posterior = duracion_clip - buffer_anterior
-                    with open(txt_path, "w", encoding="utf-8") as tf:
-                        tf.write(f"""TRANSCRIPCIÓN COMPLETA DEL {tipo_archivo.upper()}
-    ===============================================
-
-    {tipo_archivo.upper()} ORIGEN: {rel}
-    TÉRMINO ENCONTRADO: {termino}
-    TIEMPO EN {tipo_archivo.upper()}: {m}m{s:02d}s
-    FECHA ANÁLISIS: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
-    ===============================================
-    CONFIGURACIÓN DEL CLIP:
-    ===============================================
-
-    - Archivo de {tipo_archivo.lower()}: {clip_name}
-    - Duración total del clip: {duracion_clip} segundos ({duracion_clip//60}:{duracion_clip%60:02d})
-    - Tiempo antes de coincidencia: {buffer_anterior} segundos ({buffer_anterior//60}:{buffer_anterior%60:02d})
-    - Tiempo después de coincidencia: {buffer_posterior} segundos ({buffer_posterior//60}:{buffer_posterior%60:02d})
-    - Tiempo de inicio del clip: {inicio:.2f}s
-    - Momento de coincidencia: {mejor_timestamp['start']:.2f}s
-    - API de transcripción utilizada: Mistral/OpenAI Whisper
-
-    ===============================================
-    TRANSCRIPCIÓN COMPLETA (Mistral):
-    ===============================================
-
-    {transcripcion_mistral}
-
-    ===============================================
-    CONTEXTO DEL TIMESTAMP:
-    ===============================================
-
-    {mejor_texto_contexto}
-    """)
-                
-                    st.info(f"💾 Clip y transcripción guardados: {clip_name}")
-
-                    coincidencias_items.append({
-                        "termino": termino, 
-                        "archivo": rel,
-                        "tipo_archivo": tipo_archivo.lower(),
-                        "texto": idea_general_clip,  # 🤖 USAR IDEA GENERAL EN LUGAR DE CONTEXTO
-                        "contexto": idea_general_clip,  # 🤖 IDEA GENERAL DEL SEGMENTO
-                        "timestamp": timestamp_actual,  # Agregar timestamp para control de duplicados
-                        "transcripcion_completa": idea_general_clip,  # 🤖 ENVIAR SOLO IDEA GENERAL
-                        "url_cloudinary": url_cloudinary_clip,  # URL del clip en Cloudinary
-                        "url_bunny": url_bunny_clip,
-                        "url_r2": url_r2_clip,
-                    })
-
-                    # Guardar video original para revisión posterior + minuto de coincidencia.
-                    _destino_video_check, _txt_video_check, _estado_video_check = guardar_video_y_minuto_coincidencia(
-                        archivo_path,
-                        timestamp_actual,
-                        termino_detectado=termino,
-                        mover_video=False,
-                        prefijo_carpeta="_coincidencia_"
-                    )
-                    if _estado_video_check not in ("copiado", "movido", "ya_existia"):
-                        log_warning(
-                            f"No se pudo registrar video en videoscheck ({rel}): {_estado_video_check}",
-                            func_name
-                        )
-
-            progress_bar.progress(90, text="📝 Generando resumen...")
-        
-            # Si hubo coincidencias, generar resumen
-            # Inicializar resumen_archivo
-            resumen_archivo = ""
-        
-            if coincidencias_items:
-                try:
-                    resumen_archivo = generar_resumen_archivo(rel, coincidencias_items, transcripcion_mistral, tipo_archivo)
-                
-                    # Crear archivo consolidado con información de clips
-                    clips_info = []
-                    for clip in clips_generados_en_sesion:
-                        if clip['archivo_origen'] == rel:  # Solo clips de este archivo
-                            clips_info.append(clip)
-                
-                    # Llamada con argumentos posicionales para evitar errores
-                    try:
-                        # Obtener el URL de Cloudinary si está disponible
-                        video_url_consolidado = None
-                        video_url_bunny_consolidado = None
-                        video_url_r2_consolidado = None
-                        if coincidencias_items:
-                            # Intentar obtener el URL del primer clip si no hay uno general
-                            video_url_consolidado = coincidencias_items[0].get('url_cloudinary')
-                            video_url_r2_consolidado = coincidencias_items[0].get('url_r2')
-                        if clips_info:
-                            for _c in clips_info:
-                                if _c.get('url_bunny'):
-                                    video_url_bunny_consolidado = _c.get('url_bunny')
-                                    break
-
-                        archivo_completo = crear_archivo_consolidado(
-                            archivo_path, rel, coincidencias_items, transcripcion_mistral, resumen_archivo, terminos, clips_info, video_url_consolidado, video_url_bunny_consolidado, video_url_r2_consolidado
-                        )
-                    except TypeError:
-                        # Fallback sin clips_generados si hay error
-                        archivo_completo = crear_archivo_consolidado(
-                            archivo_path, rel, coincidencias_items, transcripcion_mistral, resumen_archivo, terminos
-                        )
-                
-                    if st.session_state.mostrar_coincidencias:
-                        st.markdown("### 📋 Resumen de coincidencias encontradas:")
-                        st.markdown("---")
-                    
-                        # Mostrar resumen completo en un expander expandido por defecto
-                        with st.expander("📄 **RESUMEN EJECUTIVO COMPLETO**", expanded=True):
-                            st.markdown(resumen_archivo)
-                    
-                        # Mostrar detalles adicionales de las coincidencias
-                        if coincidencias_items:
-                            st.markdown("### 🔍 **DETALLES DE COINCIDENCIAS**")
-                            for i, item in enumerate(coincidencias_items, 1):
-                                with st.expander(f"🎯 Coincidencia {i}: **{item['termino'].upper()}**", expanded=False):
-                                    col1, col2 = st.columns(2)
-                                    with col1:
-                                        st.markdown(f"**🏷️ Término encontrado:** {item['termino']}")
-                                        st.markdown(f"**📄 Tipo de archivo:** {item['tipo_archivo']}")
-                                        st.markdown(f"**📁 Archivo:** {item['archivo']}")
-                                    with col2:
-                                        st.markdown(f"**📝 Contexto:**")
-                                        st.text_area("", value=item['texto'], height=100, disabled=True, key=f"contexto_{i}_{item['termino']}")
-                    
-                        st.markdown("---")
-                
-                    st.session_state.resumen_global.extend(coincidencias_items)
-                    st.session_state.videos_procesados += 1
-                
-                    progress_bar.progress(100, text="✅ Completado")
-                    st.success(f"✅ Procesado: {len(coincidencias_items)} coincidencias - Archivo: `{os.path.basename(archivo_completo)}`")
-                
-                    # Enviar coincidencias a Supabase
-                    try:
-                        with st.spinner("🗄️ Enviando coincidencias a Supabase..."):
-                            supabase_success, supabase_msg = enviar_coincidencias_a_supabase(
-                                coincidencias_items, rel, tipo_archivo, resumen_archivo, transcripcion_mistral, None, None
+                            exito_envio, mensaje_envio, url_cloudinary_clip, url_r2_clip = enviar_coincidencia_inmediata(
+                                rel,  # nombre del archivo
+                                termino,  # término encontrado
+                                mejor_texto_contexto,  # contexto del término
+                                tipo_archivo,  # tipo de archivo
+                                clip_path,  # ruta del clip
+                                transcripcion_mistral,  # transcripción completa
+                                timestamp_actual,  # timestamp para control de duplicados
+                                resumen_estructurado,  # 📋 RESUMEN EJECUTIVO ESTRUCTURADO COMPLETO
+                                video_url=url_cloudinary_clip, # URL de Cloudinary
+                                video_url_bunny=url_bunny_clip,
+                                transcripcion_segmento=transcripcion_segmento, # Segmento resaltado
+                                video_url_r2_precargada=url_r2_clip,
                             )
-                            if supabase_success:
-                                st.success(f"🗄️ {supabase_msg}")
-                            else:
-                                st.warning(f"⚠️ {supabase_msg}")
-                    except Exception as e:
-                        st.warning(f"⚠️ Error enviando a Supabase: {str(e)}")
-                
-                    # Almacenar datos del archivo procesado para envío posterior
-                    terminos_encontrados = list(set([item['termino'] for item in coincidencias_items]))
-                    videos_procesados_data.append({
-                        'nombre_archivo': rel,
-                        'tipo_archivo': tipo_archivo,
-                        'resumen_archivo': resumen_archivo,
-                        'terminos_encontrados': terminos_encontrados,
-                        'clips_info': clips_info,
-                        'coincidencias_items': coincidencias_items,
-                        'transcripcion_completa': transcripcion_mistral  # Agregar transcripción completa
-                    })
-                
-                    st.info(f"📦 {tipo_archivo} almacenado para envío posterior: {rel}")
                     
-                    # ========== REGISTRAR VIDEO PROCESADO (CON COINCIDENCIAS) ==========
-                    registrar_archivo_procesado(rel, coincidencias_items, resumen_archivo, tipo_archivo)
-                    log_info(f"✅ Video registrado en procesados.log: {rel} ({len(coincidencias_items)} coincidencias)", func_name)
-                
-                except Exception as e:
-                        st.warning(f"⚠️ Error en resumen: {e}")
-            else:
-                progress_bar.progress(100, text="✅ Sin coincidencias")
-                if not mostrar_solo_relevantes:
-                    st.info(f"🔍 Sin coincidencias en `{rel}`")
+                            if exito_envio:
+                                st.success(f"✅ Coincidencia enviada inmediatamente: {mensaje_envio}")
+                                log_info(f"✅ Coincidencia enviada exitosamente: {termino} en {rel}", func_name)
+                            else:
+                                st.warning(f"⚠️ Error enviando coincidencia inmediata: {mensaje_envio}")
+                                log_warning(f"❌ Error enviando coincidencia: {mensaje_envio}", func_name)
+                    
+                        except Exception as e:
+                            st.warning(f"⚠️ Error generando clip para {termino}: {e}")
+                            continue
 
-                # Limpieza
-                if os.path.exists(audio_path) and audio_path != archivo_path: 
-                    os.remove(audio_path)
-            
-                # ========== REGISTRAR VIDEO PROCESADO (SIN COINCIDENCIAS) ==========
-                registrar_archivo_procesado(rel, coincidencias_items, resumen_archivo, tipo_archivo)
-                log_info(f"✅ Video registrado en procesados.log: {rel} (sin coincidencias)", func_name)
+                        # Guardar transcripción en archivo TXT (ruta física del .mp4, aunque no se adjunte en envíos)
+                        txt_path = _clip_disk_path.replace(".mp4", ".txt")
+                    
+                        buffer_posterior = duracion_clip - buffer_anterior
+                        with open(txt_path, "w", encoding="utf-8") as tf:
+                            tf.write(f"""TRANSCRIPCIÓN COMPLETA DEL {tipo_archivo.upper()}
+        ===============================================
+
+        {tipo_archivo.upper()} ORIGEN: {rel}
+        TÉRMINO ENCONTRADO: {termino}
+        TIEMPO EN {tipo_archivo.upper()}: {m}m{s:02d}s
+        FECHA ANÁLISIS: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+        ===============================================
+        CONFIGURACIÓN DEL CLIP:
+        ===============================================
+
+        - Archivo de {tipo_archivo.lower()}: {clip_name}
+        - Duración total del clip: {duracion_clip} segundos ({duracion_clip//60}:{duracion_clip%60:02d})
+        - Tiempo antes de coincidencia: {buffer_anterior} segundos ({buffer_anterior//60}:{buffer_anterior%60:02d})
+        - Tiempo después de coincidencia: {buffer_posterior} segundos ({buffer_posterior//60}:{buffer_posterior%60:02d})
+        - Tiempo de inicio del clip: {inicio:.2f}s
+        - Momento de coincidencia: {mejor_timestamp['start']:.2f}s
+        - API de transcripción utilizada: Mistral/OpenAI Whisper
+
+        ===============================================
+        TRANSCRIPCIÓN COMPLETA (Mistral):
+        ===============================================
+
+        {transcripcion_mistral}
+
+        ===============================================
+        CONTEXTO DEL TIMESTAMP:
+        ===============================================
+
+        {mejor_texto_contexto}
+        """)
+                
+                        st.info(f"💾 Clip y transcripción guardados: {clip_name}")
+
+                        coincidencias_items.append({
+                            "termino": termino, 
+                            "archivo": rel,
+                            "tipo_archivo": tipo_archivo.lower(),
+                            "texto": idea_general_clip,  # 🤖 USAR IDEA GENERAL EN LUGAR DE CONTEXTO
+                            "contexto": idea_general_clip,  # 🤖 IDEA GENERAL DEL SEGMENTO
+                            "timestamp": timestamp_actual,  # Agregar timestamp para control de duplicados
+                            "transcripcion_completa": idea_general_clip,  # 🤖 ENVIAR SOLO IDEA GENERAL
+                            "url_cloudinary": url_cloudinary_clip,  # URL del clip en Cloudinary
+                            "url_bunny": url_bunny_clip,
+                            "url_r2": url_r2_clip,
+                        })
+
+                        # Guardar video original para revisión posterior + minuto de coincidencia.
+                        _destino_video_check, _txt_video_check, _estado_video_check = guardar_video_y_minuto_coincidencia(
+                            archivo_path,
+                            timestamp_actual,
+                            termino_detectado=termino,
+                            mover_video=False,
+                            prefijo_carpeta="_coincidencia_"
+                        )
+                        if _estado_video_check not in ("copiado", "movido", "ya_existia"):
+                            log_warning(
+                                f"No se pudo registrar video en videoscheck ({rel}): {_estado_video_check}",
+                                func_name
+                            )
+
+                progress_bar.progress(90, text="📝 Generando resumen...")
         
-        except Exception as e:
-            # MANEJO DE ERRORES: Archivo falló
-            error_mensaje = f"{type(e).__name__}: {str(e)}"
-            log_error_critico(func_name, f"Error procesando archivo {rel}: {error_mensaje}")
+                # Si hubo coincidencias, generar resumen
+                # Inicializar resumen_archivo
+                resumen_archivo = ""
+        
+                if coincidencias_items:
+                    try:
+                        resumen_archivo = generar_resumen_archivo(rel, coincidencias_items, transcripcion_mistral, tipo_archivo)
+                
+                        # Crear archivo consolidado con información de clips
+                        clips_info = []
+                        for clip in clips_generados_en_sesion:
+                            if clip['archivo_origen'] == rel:  # Solo clips de este archivo
+                                clips_info.append(clip)
+                
+                        # Llamada con argumentos posicionales para evitar errores
+                        try:
+                            # Obtener el URL de Cloudinary si está disponible
+                            video_url_consolidado = None
+                            video_url_bunny_consolidado = None
+                            video_url_r2_consolidado = None
+                            if coincidencias_items:
+                                # Intentar obtener el URL del primer clip si no hay uno general
+                                video_url_consolidado = coincidencias_items[0].get('url_cloudinary')
+                                video_url_r2_consolidado = coincidencias_items[0].get('url_r2')
+                            if clips_info:
+                                for _c in clips_info:
+                                    if _c.get('url_bunny'):
+                                        video_url_bunny_consolidado = _c.get('url_bunny')
+                                        break
+
+                            archivo_completo = crear_archivo_consolidado(
+                                archivo_path, rel, coincidencias_items, transcripcion_mistral, resumen_archivo, terminos, clips_info, video_url_consolidado, video_url_bunny_consolidado, video_url_r2_consolidado
+                            )
+                        except TypeError:
+                            # Fallback sin clips_generados si hay error
+                            archivo_completo = crear_archivo_consolidado(
+                                archivo_path, rel, coincidencias_items, transcripcion_mistral, resumen_archivo, terminos
+                            )
+                
+                        if st.session_state.mostrar_coincidencias:
+                            st.markdown("### 📋 Resumen de coincidencias encontradas:")
+                            st.markdown("---")
+                    
+                            # Mostrar resumen completo en un expander expandido por defecto
+                            with st.expander("📄 **RESUMEN EJECUTIVO COMPLETO**", expanded=True):
+                                st.markdown(resumen_archivo)
+                    
+                            # Mostrar detalles adicionales de las coincidencias
+                            if coincidencias_items:
+                                st.markdown("### 🔍 **DETALLES DE COINCIDENCIAS**")
+                                for i, item in enumerate(coincidencias_items, 1):
+                                    with st.expander(f"🎯 Coincidencia {i}: **{item['termino'].upper()}**", expanded=False):
+                                        col1, col2 = st.columns(2)
+                                        with col1:
+                                            st.markdown(f"**🏷️ Término encontrado:** {item['termino']}")
+                                            st.markdown(f"**📄 Tipo de archivo:** {item['tipo_archivo']}")
+                                            st.markdown(f"**📁 Archivo:** {item['archivo']}")
+                                        with col2:
+                                            st.markdown(f"**📝 Contexto:**")
+                                            st.text_area("", value=item['texto'], height=100, disabled=True, key=f"contexto_{i}_{item['termino']}")
+                    
+                            st.markdown("---")
+                
+                        st.session_state.resumen_global.extend(coincidencias_items)
+                        st.session_state.videos_procesados += 1
+                
+                        progress_bar.progress(100, text="✅ Completado")
+                        st.success(f"✅ Procesado: {len(coincidencias_items)} coincidencias - Archivo: `{os.path.basename(archivo_completo)}`")
+                
+                        # Enviar coincidencias a Supabase
+                        try:
+                            with st.spinner("🗄️ Enviando coincidencias a Supabase..."):
+                                supabase_success, supabase_msg = enviar_coincidencias_a_supabase(
+                                    coincidencias_items, rel, tipo_archivo, resumen_archivo, transcripcion_mistral, None, None
+                                )
+                                if supabase_success:
+                                    st.success(f"🗄️ {supabase_msg}")
+                                else:
+                                    st.warning(f"⚠️ {supabase_msg}")
+                        except Exception as e:
+                            st.warning(f"⚠️ Error enviando a Supabase: {str(e)}")
+                
+                        # Almacenar datos del archivo procesado para envío posterior
+                        terminos_encontrados = list(set([item['termino'] for item in coincidencias_items]))
+                        videos_procesados_data.append({
+                            'nombre_archivo': rel,
+                            'tipo_archivo': tipo_archivo,
+                            'resumen_archivo': resumen_archivo,
+                            'terminos_encontrados': terminos_encontrados,
+                            'clips_info': clips_info,
+                            'coincidencias_items': coincidencias_items,
+                            'transcripcion_completa': transcripcion_mistral  # Agregar transcripción completa
+                        })
+                
+                        st.info(f"📦 {tipo_archivo} almacenado para envío posterior: {rel}")
+                    
+                        # ========== REGISTRAR VIDEO PROCESADO (CON COINCIDENCIAS) ==========
+                        registrar_archivo_procesado(rel, coincidencias_items, resumen_archivo, tipo_archivo)
+                        log_info(f"✅ Video registrado en procesados.log: {rel} ({len(coincidencias_items)} coincidencias)", func_name)
+                        post_procesar_video_origen(
+                            archivo_path, rel, coincidencias_items, menciones_tangenciales_data
+                        )
+                
+                    except Exception as e:
+                            st.warning(f"⚠️ Error en resumen: {e}")
+                else:
+                    progress_bar.progress(100, text="✅ Sin coincidencias")
+                    if not mostrar_solo_relevantes:
+                        st.info(f"🔍 Sin coincidencias en `{rel}`")
+
+                    # Limpieza
+                    if os.path.exists(audio_path) and audio_path != archivo_path: 
+                        os.remove(audio_path)
             
-            # Guardar archivo fallido (mueve, crea txt, envía notificaciones)
-            guardar_archivo_fallido(
-                nombre_archivo=rel,
-                error_mensaje=error_mensaje,
-                archivo_path=archivo_path
-            )
+                    # ========== REGISTRAR VIDEO PROCESADO (SIN COINCIDENCIAS) ==========
+                    registrar_archivo_procesado(rel, coincidencias_items, resumen_archivo, tipo_archivo)
+                    log_info(f"✅ Video registrado en procesados.log: {rel} (sin coincidencias)", func_name)
+                    post_procesar_video_origen(
+                        archivo_path, rel, coincidencias_items, menciones_tangenciales_data
+                    )
+        
+            except Exception as e:
+                # MANEJO DE ERRORES: Archivo falló
+                error_mensaje = f"{type(e).__name__}: {str(e)}"
+                if es_error_archivo_en_uso(e):
+                    encolar_video_en_uso_fin_ciclo(archivo_path, rel, error_mensaje, cola_en_uso)
+                    continue
+                log_error_critico(func_name, f"Error procesando archivo {rel}: {error_mensaje}")
             
-            # Continuar con el siguiente archivo
-            continue
+                # Guardar archivo fallido (mueve, crea txt, envía notificaciones)
+                guardar_archivo_fallido(
+                    nombre_archivo=rel,
+                    error_mensaje=error_mensaje,
+                    archivo_path=archivo_path
+                )
+            
+                # Continuar con el siguiente archivo
+                continue
 
     # FASE 2: ENVIAR TODOS LOS ARCHIVOS PROCESADOS AL WEBHOOK
+    _mostrar_resumen_borrados_ciclo()
     if videos_procesados_data:
         st.success(f"✅ FASE 1 COMPLETADA: {len(videos_procesados_data)} archivos procesados exitosamente")
         st.info("🌐 FASE 2: Enviando todos los archivos al webhook con pausas de 60s")
@@ -13538,6 +14053,7 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
     # === FINALIZACIÓN - LOOP AUTOMÁTICO ===
     st.markdown("---")
     st.success(f"✅ **CICLO COMPLETADO** - {len(videos_procesados_data)} archivos procesados en este ciclo")
+    _mostrar_resumen_borrados_ciclo()
     
     # Contar ciclo
     if 'loop_ciclo_numero' not in st.session_state:

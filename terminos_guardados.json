@@ -1,0 +1,130 @@
+{
+  "terminos": [
+    {
+      "termino": "edesur",
+      "cliente_id": "default"
+    },
+    {
+      "termino": "apagones",
+      "cliente_id": "default"
+    },
+    {
+      "termino": "pacto electrico",
+      "cliente_id": "default"
+    },
+    {
+      "termino": "jose actics",
+      "cliente_id": "default"
+    },
+    {
+      "termino": "factura electrica",
+      "cliente_id": "default"
+    },
+    {
+      "termino": "celso marranzini",
+      "cliente_id": "default"
+    },
+    {
+      "termino": "celsomarrancini",
+      "cliente_id": "default"
+    },
+    {
+      "termino": "egehid",
+      "cliente_id": "default"
+    },
+    {
+      "termino": "cued",
+      "cliente_id": "default"
+    },
+    {
+      "termino": "apagon",
+      "cliente_id": "default"
+    },
+    {
+      "termino": "punta catalina",
+      "cliente_id": "default"
+    },
+    {
+      "termino": "sistema electrico",
+      "cliente_id": "default"
+    },
+    {
+      "termino": "pegase",
+      "cliente_id": "default"
+    },
+    {
+      "termino": "protecom",
+      "cliente_id": "default"
+    },
+    {
+      "termino": "servicio eléctrico",
+      "cliente_id": "default"
+    },
+    {
+      "termino": "sistema electrico",
+      "cliente_id": "default"
+    },
+    {
+      "termino": "intrant",
+      "cliente_id": "intrant"
+    },
+    {
+      "termino": "milton morrison",
+      "cliente_id": "intrant"
+    },
+    {
+      "termino": "morrison",
+      "cliente_id": "intrant"
+    },
+    {
+      "termino": "digest",
+      "cliente_id": "intrant"
+    },
+    {
+      "termino": "erredevial",
+      "cliente_id": "intrant"
+    },
+    {
+      "termino": "digeset",
+      "cliente_id": "intrant"
+    },
+    {
+      "termino": "educación",
+      "cliente_id": "minerd"
+    },
+    {
+      "termino": "ministro de educación",
+      "cliente_id": "minerd"
+    },
+    {
+      "termino": "Luis Miguel De Camps",
+      "cliente_id": "minerd"
+    },
+    {
+      "termino": "pruebas nacionales",
+      "cliente_id": "minerd"
+    },
+    {
+      "termino": "inabie",
+      "cliente_id": "minerd"
+    },
+    {
+      "termino": "prm",
+      "cliente_id": "presidencia"
+    },
+    {
+      "termino": "abinader",
+      "cliente_id": "presidencia"
+    },
+    {
+      "termino": "luis abinader",
+      "cliente_id": "presidencia"
+    }
+  ],
+  "intervalo": 60,
+  "duracion_clip": 90,
+  "buffer_anterior": 0,
+  "mostrar_coincidencias": true,
+  "fecha_actualizacion": "2026-07-17T00:18:38.047104",
+  "total_terminos": 30
+}

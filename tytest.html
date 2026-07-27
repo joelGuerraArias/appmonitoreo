@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>📺 Videos de YouTube - Edesur (Apify)</title>
+  <style>
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: #f5f6fa;
+      color: #2f3640;
+      margin: 40px;
+    }
+    h1 {
+      text-align: center;
+      color: #273c75;
+    }
+    .video-card {
+      background: white;
+      border-radius: 10px;
+      padding: 15px;
+      margin: 20px auto;
+      max-width: 650px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      transition: transform 0.2s;
+    }
+    .video-card:hover {
+      transform: scale(1.01);
+    }
+    img {
+      width: 100%;
+      border-radius: 8px;
+    }
+    a {
+      color: #0097e6;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    .meta {
+      font-size: 0.9em;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎥 Últimos videos sobre Edesur</h1>
+  <div id="videos"></div>
+
+  <script>
+    const API_URL = "https://api.allorigins.win/raw?url=" + encodeURIComponent(
+      "https://api.apify.com/v2/datasets/hFjjAdfqfuTee3vPA/items?token=YOUR_APIFY_TOKEN"
+    );
+
+    async function fetchVideos() {
+      try {
+        const res = await fetch(API_URL);
+        if (!res.ok) throw new Error("Error al cargar datos: " + res.status);
+        return await res.json();
+      } catch (err) {
+        console.error(err);
+        document.getElementById("videos").innerHTML = "<p>Error cargando los videos 😢</p>";
+        return [];
+      }
+    }
+
+    function renderVideos(videos) {
+      const container = document.getElementById("videos");
+      if (videos.length === 0) {
+        container.innerHTML = "<p>No hay videos disponibles.</p>";
+        return;
+      }
+
+      videos.forEach(v => {
+        const card = document.createElement("div");
+        card.className = "video-card";
+        card.innerHTML = `
+          <h2>${v.title}</h2>
+          <img src="${v.thumbnailUrl}" alt="${v.title}">
+          <p>${v.text ? v.text.slice(0, 250) + "..." : "Sin descripción."}</p>
+          <p class="meta">
+            📅 ${new Date(v.date).toLocaleString("es-DO")}<br>
+            👤 <a href="${v.channelUrl}" target="_blank">${v.channelName}</a><br>
+            🔗 <a href="${v.url}" target="_blank">Ver en YouTube</a>
+          </p>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    (async () => {
+      const videos = await fetchVideos();
+      renderVideos(videos);
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 Sistema de Alerta de Medios - Edesur</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Netflix-style Header -->
+    <header class="header">
+        <div class="logo">Sistema de Alerta Edesur</div>
+        <nav class="nav-buttons">
+            <button class="btn" onclick="refreshData()">🔄 Actualizar</button>
+            <button class="btn btn-primary" onclick="exportReport()">📊 Exportar</button>
+        </nav>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content fade-in visible">
+            <div class="alert-badge">🚨 COINCIDENCIA DETECTADA</div>
+            <h1>Sistema de Alerta de Medios</h1>
+            <p>Monitoreo inteligente de contenido en tiempo real</p>
+            <div class="status-indicator">Sistema activo y monitoreando</div>
+        </div>
+    </section>
+
+    <!-- Main Content -->
+    <div class="container">
+        <!-- Coincidence Card -->
+        <div class="coincidence-card fade-in">
+            <div class="card-header">
+                <div class="card-title">Coincidencia Detectada: apagones</div>
+                <div class="timestamp">📅 26/09/2025 14:53:10</div>
+            </div>
+
+            <!-- Media Information -->
+            <div class="media-info">
+                <h3>Información del Medio</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">Programa</div>
+                        <div class="info-value">Panorama TV</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Horario</div>
+                        <div class="info-value">1:55 PM del 26 de septiembre de 2025</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Archivo Original</div>
+                        <div class="info-value">Parnorama TV_720p_2025-09-26_13-55-11_seg049.mp4</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Video Player -->
+            <div class="video-player" id="videoContainer">
+                <button class="play-button" onclick="playVideo()" id="playBtn">
+                    <span id="playIcon">▶️</span>
+                </button>
+            </div>
+
+            <!-- Video Source Info -->
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-label">Video de Cloudinary</div>
+                    <div class="info-value">
+                        <a href="https://res.cloudinary.com/dhzxzbkmc/video/upload/v1758912700/video_analyzer_clips/video_analyzer_clips/apagones__20250926_145052_apagones_1m18s.mp4"
+                           target="_blank" style="color: #ffd700;">🔗 Ver video original</a>
+                    </div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Enlace Directo</div>
+                    <div class="info-value">
+                        <a href="https://res.cloudinary.com/dhzxzbkmc/video/upload/v1758912700/video_analyzer_clips/video_analyzer_clips/apagones__20250926_145052_apagones_1m18s.mp4"
+                           target="_blank" style="color: #ffd700;">🔗 Acceso directo</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Terms Detected -->
+            <div style="margin: 1.5rem 0;">
+                <h4 style="color: #ffd700; margin-bottom: 1rem;">🔍 Términos Detectados</h4>
+                <div class="terms-detected">
+                    <span class="term-badge">apagones</span>
+                </div>
+            </div>
+
+            <!-- Executive Summary -->
+            <div class="summary-section">
+                <div class="summary-title">Resumen Ejecutivo</div>
+                <div style="margin-bottom: 1rem;">
+                    <strong>Tema principal:</strong> Se detectó una mención del término "apagones" en el contenido.
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <strong>Contexto:</strong> quinientos dólares. Como compensación por los apagones.
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <strong>Puntos clave:</strong> El término "apagones" fue identificado en el contexto del programa, indicando relevancia informativa.
+                </div>
+                <div>
+                    <strong>Relevancia:</strong> Esta mención es significativa para el monitoreo de contenido y puede requerir seguimiento adicional.
+                </div>
+            </div>
+
+            <!-- Transcription -->
+            <div>
+                <h4 style="color: #ffd700; margin-bottom: 1rem;">📝 Transcripción del Contenido</h4>
+                <div class="transcription">
+Oye, oye, Kennedy. Oye, oye. Dímelo. Yo te, oye, oye. Yo vivo aquí en Carolina del Norte, yo vivo en Gosboro, de Carolina del Norte. Oye, dile a él otra vez, ¿dónde? Cimiento, Gos, Cimiento. Dile dónde que tú vives. Gosboro. Gosboro. Tú ni lo puedes pronunciar. En Carolina del Norte, oye, oye bien. Ahí no hay ni plata, no te estás loco. Oye, y a mí, oye, aquí, aquí hubo un apagón. Aquí hubo un apagón. Sí. Y a los dos minutos me mandaba un mensaje a mi celular. Oye, oye. Que hubo un fallo eléctrico que iba a estar la luz, iba a estar la luz ininterrumpida por un espacio de dos a tres horas. Oye. Que ellos se disculpaban en la mañana. Un mensaje de una vez. Eso fue a la 10, eso fue a la 10 y 20. Y cuando llegó la factura eléctrica, José. Espera, espera, escúchame. Escúchame. Y vino la luz como a eso de las 2 de la mañana. Sí. Bien, eso fue 30 de junio. Me sucedió eso. Y a mí, el día 5 de julio, me llegó un cheque de la compañía Duke Electric de aquí de North Carolina, de 2.500 dólares. ¿Cómo compensación por los apagones? Aquí no. No, por si acaso. Aquí te roban la luz, te la cortan como quieran. Algo, algo de la nevera. Es por si me han dañado algo de los comestibles. José, gracias. La próxima llamada ya nos está acabando el tiempo. La próxima. Buenas. Buenas. ¿Quién nos sabe de dónde? La próxima y última llamada. No, no, no, no. No, no, no, no. Estamos en tiempo. Si te tienes que ir a tu casa. No, no se ha terminado el tiempo. Vamos a ver. Buenas. Buenas tardes. Buenas. Buenas tardes, de Santiago. Adelante, adelante, de Santiago. Yo veo esto cada día peor. Este presidente. Espera, espera. Es que no podemos permitir que todo el que llame aquí para criticar. ¿Y qué es lo que tú crees? Porque estamos en Cuba. Hay algo positivo. Que si estamos en Cuba, así que está la vaina. Pero tú eres quien incentiva eso. Adelante, dímelo. ¿Quién incentiva eso? Porque está mala la vaina. Eso no es verdad. Para el único tú eres bueno para ti. No, yo no. Yo soy amigo del pueblo. Hace falta el servicio secreto de la gente. Amigo del pueblo. Que te venga a recoger aquí. Buenas, adelante. Sí, sí, buenas, desde Santiago. Rajel le habla. Adelante. Yo veo este país cada día para atrás como el sangre. Eso no es verdad. Mucha delincuencia, mucha delincuencia, muertes por todos lados, accidentes. Esto está fuera de control. A propósito de accidentes, no te me vayas. Ponme eso ahí, ponme esa fotografía. Miren, Cintia, nuestra productora, fue chocada por ese caballero que está en la fotografía. La chocó y salió huyendo. Ella está en este momento, la productora de este programa, con el fémur roto, cortada por todos lados, herida, le están haciendo pruebas, sonografía, porque ese caballero, cualquiera puede tener un accidente, la verdad. Ahora, ¿cómo usted sale huyendo, deja a la víctima, sobre todo por la condición de dama, incluso, entendiendo que es frágil, la chocó y la dejó tirada? Ya la gente, las autoridades, saben quién es el irresponsable que la chocó, que le rompió el fémur, que la motocicleta de esa joven donde ella iba está destruida. Ese señor ni siquiera se detuvo. Esos son unos carritos chiquitos que andan ahora haciendo Uber y jodiendo, que andan con el diablo arriba, con Satanás arriba. Lo dejás, mira, se meten por el frente tuyo, cortan, una locura. Yo todos los días sufro las consecuencias de esos tipos. Sin embargo, la vida es tan injusta que le tocó a nuestra productora hoy. Una joven talentosa, brillante. Está postrada en su casa gracias a ese caballero. Sígame diciendo, señor, excúseme. Sí, yo estoy de acuerdo con ese sistema de esos carritos que andan en la autopista Duarte, que se meten a la izquierda, a la derecha, sin poner luces, como sin nada, como que andan como un perro sin lea en la calle. Gracias por su llamada. Gracias. La última. Mira, Domingo, antes que entre la última. Tú sabes que en Puerto Rico está a punto de firmarse el acuerdo entre el gobierno de los Estados Unidos y César, el abusador. ¿En qué términos? Lo primero es que él va a decir a qué políticos y a qué policía él le daba dinero de la droga. ¿Y tiene credibilidad? Yo no sé. Pregúntale a los gringos, que son los que van a firmar ese acuerdo, si ellos están o no de acuerdo. Ahora, dice mucho que desde el año 1996, dice en ese testimonio, un trabajo hecho por el amigo José Monegro del periódico El Día, que es el que trae.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

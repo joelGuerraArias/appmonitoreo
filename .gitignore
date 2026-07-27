@@ -1,0 +1,103 @@
+# ============================================
+# VIDEO ANALYZER - GITIGNORE
+# ============================================
+
+# === ARCHIVOS DE CONFIGURACIÓN SENSIBLES ===
+.env
+*.env.local
+.env.*.local
+
+# === PYTHON ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# === ENTORNOS VIRTUALES ===
+venv/
+venv_*/
+ENV/
+env/
+.venv/
+
+# === LOGS ===
+logs/
+*.log
+
+# === ARCHIVOS TEMPORALES ===
+*.tmp
+*.temp
+*.wav
+*.mp3
+
+# === IDE ===
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# === ARCHIVOS DE SISTEMA ===
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# === ARCHIVOS DE CACHÉ ===
+.cache/
+*.cache
+
+# === ARCHIVOS DE CONFIGURACIÓN JSON SENSIBLES ===
+brevo_config.json
+telegram_config.json
+cloudinary_config.json
+webhook_config.json
+correos_guardados.json
+clientes_config.json
+
+# === BINARIOS Y MEDIOS LOCALES (no subir) ===
+ffmpeg.zip
+*.mp4
+*.lnk
+clientes_config.BROKEN*
+clientes_config.bak*
+diagnostico_coincidencias_*.json
+fallidos.txt
+
+# === CARPETAS DE VIDEOS Y DATOS LOCALES (muy grandes) ===
+videos procesados/
+subclips/
+videoscheck/
+test_videos/
+archivos_fallidos/
+audiochecks/
+AUDIOS/
+cat/
+grabaciones/
+_ext_tmp/
+_pw_profile/
+ffmpeg-8.0-essentials_build/
+edesur_tv/**/node_modules/
+edesur_tv/VIDEOS/
+
+# Descomentar si no quieres incluir videos en git
+# videos/
+
+# Backups locales con secretos
+backups/
+

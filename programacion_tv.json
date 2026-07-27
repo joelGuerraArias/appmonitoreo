@@ -1,0 +1,1387 @@
+{
+  "Teleantillas": {
+    "escaneo_solo_dias": "lunes_a_viernes",
+    "escaneo_solo_horarios": [
+      {
+        "inicio": "05:00",
+        "fin": "07:00",
+        "programa": "Revista 110"
+      },
+      {
+        "inicio": "07:00",
+        "fin": "09:00",
+        "programa": "Una nueva mañana"
+      },
+      {
+        "inicio": "09:00",
+        "fin": "10:00",
+        "programa": "Uno + Uno"
+      }
+    ],
+    "lunes_a_viernes": {
+      "01": {
+        "inicio": "00:00",
+        "fin": "01:00",
+        "programa": "D'agenda"
+      },
+      "02": {
+        "inicio": "01:00",
+        "fin": "02:00",
+        "programa": "Yayo Pinto"
+      },
+      "03": {
+        "inicio": "02:00",
+        "fin": "03:00",
+        "programa": "Propuesta semanal"
+      },
+      "04": {
+        "inicio": "03:00",
+        "fin": "04:00",
+        "programa": "Triálogo"
+      },
+      "05": {
+        "inicio": "04:00",
+        "fin": "05:00",
+        "programa": "Alexandra Izquierdo"
+      },
+      "06": {
+        "inicio": "05:00",
+        "fin": "07:00",
+        "programa": "Revista 110"
+      },
+      "07": {
+        "inicio": "07:00",
+        "fin": "09:00",
+        "programa": "Una nueva mañana"
+      },
+      "08": {
+        "inicio": "09:00",
+        "fin": "10:00",
+        "programa": "Uno + Uno"
+      },
+      "09": {
+        "inicio": "10:00",
+        "fin": "11:00",
+        "programa": "CNN América"
+      },
+      "10": {
+        "inicio": "11:00",
+        "fin": "12:00",
+        "programa": "Primera jugada"
+      },
+      "11": {
+        "inicio": "12:00",
+        "fin": "13:00",
+        "programa": "CNN América"
+      },
+      "12": {
+        "inicio": "13:00",
+        "fin": "15:00",
+        "programa": "Esto No Tiene Nombre"
+      },
+      "13": {
+        "inicio": "15:00",
+        "fin": "15:15",
+        "programa": "A 2 camaras"
+      },
+      "14": {
+        "inicio": "15:15",
+        "fin": "16:00",
+        "programa": "Al fondo hay sitio"
+      },
+      "15": {
+        "inicio": "16:00",
+        "fin": "17:00",
+        "programa": "Piezas rotas"
+      },
+      "16": {
+        "inicio": "17:00",
+        "fin": "18:00",
+        "programa": "Canto para no llorar"
+      },
+      "17": {
+        "inicio": "18:00",
+        "fin": "19:00",
+        "programa": "Desafío"
+      },
+      "18": {
+        "inicio": "19:00",
+        "fin": "22:00",
+        "programa": "MLB"
+      },
+      "19": {
+        "inicio": "22:00",
+        "fin": "23:00",
+        "programa": "Panorama Mundial"
+      },
+      "20": {
+        "inicio": "23:00",
+        "fin": "24:00",
+        "programa": "Conclusiones"
+      }
+    }
+  },
+  "Telemicro": {
+    "escaneo_solo_dias": "lunes_a_viernes",
+    "escaneo_solo_horarios": [
+      {
+        "inicio": "05:00",
+        "fin": "06:00",
+        "programa": "La opción de la mañana"
+      },
+      {
+        "inicio": "06:00",
+        "fin": "08:00",
+        "programa": "Matinal"
+      },
+      {
+        "inicio": "14:00",
+        "fin": "15:00",
+        "programa": "Noticias Telemicro"
+      },
+      {
+        "inicio": "22:00",
+        "fin": "23:00",
+        "programa": "Noticias Telemicro"
+      }
+    ],
+    "lunes_a_viernes": {
+      "01": {
+        "inicio": "00:00",
+        "fin": "01:00",
+        "programa": "Noticiero Univisión"
+      },
+      "02": {
+        "inicio": "01:00",
+        "fin": "02:00",
+        "programa": "Mortales"
+      },
+      "03": {
+        "inicio": "02:00",
+        "fin": "03:00",
+        "programa": "Noticiero Univisión"
+      },
+      "04": {
+        "inicio": "03:00",
+        "fin": "05:00",
+        "programa": "Telemicro"
+      },
+      "05": {
+        "inicio": "05:00",
+        "fin": "06:00",
+        "programa": "La opción de la mañana"
+      },
+      "06": {
+        "inicio": "06:00",
+        "fin": "08:00",
+        "programa": "Matinal"
+      },
+      "07": {
+        "inicio": "08:00",
+        "fin": "11:00",
+        "programa": "Despierta América"
+      },
+      "08": {
+        "inicio": "11:00",
+        "fin": "12:00",
+        "programa": "La Rosa de Guadalupe"
+      },
+      "09": {
+        "inicio": "12:00",
+        "fin": "13:00",
+        "programa": "Papás por Conveniencia"
+      },
+      "10": {
+        "inicio": "13:00",
+        "fin": "14:00",
+        "programa": "Alborada"
+      },
+      "11": {
+        "inicio": "14:00",
+        "fin": "15:00",
+        "programa": "Noticias Telemicro"
+      },
+      "12": {
+        "inicio": "15:00",
+        "fin": "16:00",
+        "programa": "Tú y yo"
+      },
+      "13": {
+        "inicio": "16:00",
+        "fin": "17:00",
+        "programa": "A.Mar donde el amor teje"
+      },
+      "14": {
+        "inicio": "17:00",
+        "fin": "18:00",
+        "programa": "El Gordo y la Flaca"
+      },
+      "15": {
+        "inicio": "18:00",
+        "fin": "19:00",
+        "programa": "Primer impacto"
+      },
+      "16": {
+        "inicio": "19:00",
+        "fin": "20:00",
+        "programa": "Monteverde"
+      },
+      "17": {
+        "inicio": "20:00",
+        "fin": "21:00",
+        "programa": "Juegos de Amor y Poder"
+      },
+      "18": {
+        "inicio": "21:00",
+        "fin": "22:00",
+        "programa": "Amor y esperanza"
+      },
+      "19": {
+        "inicio": "22:00",
+        "fin": "23:00",
+        "programa": "Noticias Telemicro"
+      },
+      "20": {
+        "inicio": "23:00",
+        "fin": "24:00",
+        "programa": "Noticiero Univisión"
+      }
+    }
+  },
+  "Antena Latina": {
+    "escaneo_solo_dias": "lunes_a_viernes",
+    "escaneo_solo_horarios": [
+      {
+        "inicio": "05:00",
+        "fin": "06:00",
+        "programa": "AN7 - 2da. emisión"
+      },
+      {
+        "inicio": "06:00",
+        "fin": "07:00",
+        "programa": "AN 7 Amanecer"
+      },
+      {
+        "inicio": "07:00",
+        "fin": "08:00",
+        "programa": "AN7 Actualidad"
+      },
+      {
+        "inicio": "08:00",
+        "fin": "09:00",
+        "programa": "AN7 Revista"
+      },
+      {
+        "inicio": "13:00",
+        "fin": "14:00",
+        "programa": "AN7 Meridiano"
+      },
+      {
+        "inicio": "21:00",
+        "fin": "22:00",
+        "programa": "AN7 - 2da. emisión"
+      }
+    ],
+    "lunes_a_viernes": {
+      "01": {
+        "inicio": "00:00",
+        "fin": "01:00",
+        "programa": "Los Borgias"
+      },
+      "02": {
+        "inicio": "01:00",
+        "fin": "02:00",
+        "programa": "Julio César"
+      },
+      "03": {
+        "inicio": "02:00",
+        "fin": "03:00",
+        "programa": "La tercera verdad"
+      },
+      "04": {
+        "inicio": "03:00",
+        "fin": "04:00",
+        "programa": "The company"
+      },
+      "05": {
+        "inicio": "04:00",
+        "fin": "05:00",
+        "programa": "Revelations"
+      },
+      "06": {
+        "inicio": "05:00",
+        "fin": "06:00",
+        "programa": "AN7 - 2da. emisión"
+      },
+      "07": {
+        "inicio": "06:00",
+        "fin": "07:00",
+        "programa": "AN 7 Amanecer"
+      },
+      "08": {
+        "inicio": "07:00",
+        "fin": "08:00",
+        "programa": "AN7 Actualidad"
+      },
+      "09": {
+        "inicio": "08:00",
+        "fin": "09:00",
+        "programa": "AN7 Revista"
+      },
+      "10": {
+        "inicio": "09:00",
+        "fin": "09:30",
+        "programa": "Miles del mañana"
+      },
+      "11": {
+        "inicio": "09:30",
+        "fin": "10:00",
+        "programa": "Sofia the First"
+      },
+      "12": {
+        "inicio": "10:00",
+        "fin": "10:30",
+        "programa": "Bugs Bunny"
+      },
+      "13": {
+        "inicio": "10:30",
+        "fin": "11:00",
+        "programa": "Tom y Jerry"
+      },
+      "14": {
+        "inicio": "11:00",
+        "fin": "12:00",
+        "programa": "Perdoname"
+      },
+      "15": {
+        "inicio": "12:00",
+        "fin": "13:00",
+        "programa": "Elif"
+      },
+      "16": {
+        "inicio": "13:00",
+        "fin": "14:00",
+        "programa": "AN7 Meridiano"
+      },
+      "17": {
+        "inicio": "14:00",
+        "fin": "15:00",
+        "programa": "La promesa"
+      },
+      "18": {
+        "inicio": "15:00",
+        "fin": "16:00",
+        "programa": "El Cuerpo del Deseo"
+      },
+      "19": {
+        "inicio": "16:00",
+        "fin": "17:00",
+        "programa": "Comisario Rex"
+      },
+      "20": {
+        "inicio": "17:00",
+        "fin": "18:00",
+        "programa": "Legado de Amor"
+      },
+      "21": {
+        "inicio": "18:00",
+        "fin": "19:00",
+        "programa": "Cuando los ángeles caen"
+      },
+      "22": {
+        "inicio": "19:00",
+        "fin": "20:00",
+        "programa": "Corazón abandonado"
+      },
+      "23": {
+        "inicio": "20:00",
+        "fin": "21:00",
+        "programa": "Fruto prohíbido"
+      },
+      "24": {
+        "inicio": "21:00",
+        "fin": "22:00",
+        "programa": "AN7 - 2da. emisión"
+      },
+      "25": {
+        "inicio": "22:00",
+        "fin": "23:00",
+        "programa": "The Chosen"
+      },
+      "26": {
+        "inicio": "23:00",
+        "fin": "24:00",
+        "programa": "Fear the Walking Dead"
+      }
+    }
+  },
+  "Color Vision": {
+    "escaneo_solo_dias": "lunes_a_viernes",
+    "escaneo_solo_horarios": [
+      {
+        "inicio": "05:00",
+        "fin": "08:00",
+        "programa": "Hoy Mismo"
+      },
+      {
+        "inicio": "14:00",
+        "fin": "15:00",
+        "programa": "Noticias SIN - 1ra emisión"
+      },
+      {
+        "inicio": "19:00",
+        "fin": "20:00",
+        "programa": "Noticias y mucho más"
+      },
+      {
+        "inicio": "22:00",
+        "fin": "23:00",
+        "programa": "Noticias SIN - Edición estelar"
+      }
+    ],
+    "lunes_a_viernes": {
+      "01": {
+        "inicio": "00:00",
+        "fin": "01:00",
+        "programa": "Vamos"
+      },
+      "02": {
+        "inicio": "01:00",
+        "fin": "02:30",
+        "programa": "Pequeños grandes talentos"
+      },
+      "03": {
+        "inicio": "02:30",
+        "fin": "04:00",
+        "programa": "Peliculas"
+      },
+      "04": {
+        "inicio": "04:00",
+        "fin": "05:00",
+        "programa": "Aeromundo"
+      },
+      "05": {
+        "inicio": "05:00",
+        "fin": "08:00",
+        "programa": "Hoy Mismo"
+      },
+      "06": {
+        "inicio": "08:00",
+        "fin": "10:00",
+        "programa": "El Despertador"
+      },
+      "07": {
+        "inicio": "10:00",
+        "fin": "11:00",
+        "programa": "Dulce venganza"
+      },
+      "08": {
+        "inicio": "11:00",
+        "fin": "12:00",
+        "programa": "Pasión de Gavilanes"
+      },
+      "09": {
+        "inicio": "12:00",
+        "fin": "14:00",
+        "programa": "El show del mediodía"
+      },
+      "10": {
+        "inicio": "14:00",
+        "fin": "15:00",
+        "programa": "Noticias SIN - 1ra emisión"
+      },
+      "11": {
+        "inicio": "15:00",
+        "fin": "15:30",
+        "programa": "Pinky y Cerebro"
+      },
+      "12": {
+        "inicio": "15:30",
+        "fin": "16:00",
+        "programa": "Scooby doo"
+      },
+      "13": {
+        "inicio": "16:00",
+        "fin": "17:00",
+        "programa": "Flor salvaje"
+      },
+      "14": {
+        "inicio": "17:00",
+        "fin": "18:00",
+        "programa": "Cuando seas mía"
+      },
+      "15": {
+        "inicio": "18:00",
+        "fin": "19:00",
+        "programa": "Una luz de esperanza"
+      },
+      "16": {
+        "inicio": "19:00",
+        "fin": "20:00",
+        "programa": "Noticias y mucho más"
+      },
+      "17": {
+        "inicio": "20:00",
+        "fin": "21:00",
+        "programa": "Golden boy"
+      },
+      "18": {
+        "inicio": "21:00",
+        "fin": "22:00",
+        "programa": "El informe"
+      },
+      "19": {
+        "inicio": "22:00",
+        "fin": "23:00",
+        "programa": "Noticias SIN - Edición estelar"
+      },
+      "20": {
+        "inicio": "23:00",
+        "fin": "24:00",
+        "programa": "Hasta que la plata nos separe"
+      }
+    }
+  },
+  "Telesistema": {
+    "escaneo_solo_dias": "lunes_a_viernes",
+    "escaneo_solo_horarios": [
+      {
+        "inicio": "06:00",
+        "fin": "08:00",
+        "programa": "El dia"
+      },
+      {
+        "inicio": "08:00",
+        "fin": "09:00",
+        "programa": "Telematutino 11"
+      },
+      {
+        "inicio": "13:00",
+        "fin": "13:30",
+        "programa": "Telenoticias - Emisión vespertina"
+      },
+      {
+        "inicio": "17:00",
+        "fin": "17:30",
+        "programa": "Telenoticias - Emisión vespertina"
+      },
+      {
+        "inicio": "22:00",
+        "fin": "23:00",
+        "programa": "Telenoticias - Emisión estelar"
+      }
+    ],
+    "lunes_a_viernes": {
+      "01": {
+        "inicio": "00:00",
+        "fin": "00:30",
+        "programa": "Cine de medianoche"
+      },
+      "02": {
+        "inicio": "00:30",
+        "fin": "01:00",
+        "programa": "Programación 24 horas"
+      },
+      "03": {
+        "inicio": "01:00",
+        "fin": "02:00",
+        "programa": "D'agenda"
+      },
+      "04": {
+        "inicio": "02:00",
+        "fin": "03:00",
+        "programa": "Yayo Pinto"
+      },
+      "05": {
+        "inicio": "03:00",
+        "fin": "04:00",
+        "programa": "Propuesta semanal"
+      },
+      "06": {
+        "inicio": "04:00",
+        "fin": "05:00",
+        "programa": "Triálogo"
+      },
+      "07": {
+        "inicio": "05:00",
+        "fin": "06:00",
+        "programa": "Alexandra Izquierdo"
+      },
+      "08": {
+        "inicio": "06:00",
+        "fin": "08:00",
+        "programa": "El dia"
+      },
+      "09": {
+        "inicio": "08:00",
+        "fin": "09:00",
+        "programa": "Telematutino 11"
+      },
+      "10": {
+        "inicio": "09:00",
+        "fin": "09:30",
+        "programa": "Con el consumidor"
+      },
+      "11": {
+        "inicio": "09:30",
+        "fin": "10:00",
+        "programa": "Marvel Ultimate Spiderman"
+      },
+      "12": {
+        "inicio": "10:00",
+        "fin": "10:30",
+        "programa": "Avengers Assemble"
+      },
+      "13": {
+        "inicio": "10:30",
+        "fin": "11:00",
+        "programa": "Timon y Pumba"
+      },
+      "14": {
+        "inicio": "11:00",
+        "fin": "11:55",
+        "programa": "Caso Cerrado"
+      },
+      "15": {
+        "inicio": "11:55",
+        "fin": "12:00",
+        "programa": "Lotedom"
+      },
+      "16": {
+        "inicio": "12:00",
+        "fin": "13:00",
+        "programa": "Acorralada"
+      },
+      "17": {
+        "inicio": "13:00",
+        "fin": "13:30",
+        "programa": "Telenoticias - Emisión vespertina"
+      },
+      "18": {
+        "inicio": "13:30",
+        "fin": "14:00",
+        "programa": "Arte y medio"
+      },
+      "19": {
+        "inicio": "14:00",
+        "fin": "15:00",
+        "programa": "Almas Heridas"
+      },
+      "20": {
+        "inicio": "15:00",
+        "fin": "15:30",
+        "programa": "Jonas"
+      },
+      "21": {
+        "inicio": "15:30",
+        "fin": "16:00",
+        "programa": "Jessie"
+      },
+      "22": {
+        "inicio": "16:00",
+        "fin": "17:00",
+        "programa": "Victoria"
+      },
+      "23": {
+        "inicio": "17:00",
+        "fin": "17:30",
+        "programa": "Telenoticias - Emisión vespertina"
+      },
+      "24": {
+        "inicio": "17:30",
+        "fin": "18:00",
+        "programa": "Arte y medio"
+      },
+      "25": {
+        "inicio": "18:00",
+        "fin": "19:00",
+        "programa": "Caso Cerrado"
+      },
+      "26": {
+        "inicio": "22:00",
+        "fin": "23:00",
+        "programa": "Telenoticias - Emisión estelar"
+      },
+      "27": {
+        "inicio": "23:00",
+        "fin": "24:00",
+        "programa": "Cine de medianoche"
+      }
+    }
+  },
+  "Telecentro": {
+    "escaneo_solo_dias": "lunes_a_viernes",
+    "escaneo_solo_horarios": [
+      {
+        "inicio": "06:00",
+        "fin": "08:00",
+        "programa": "Despierta RD"
+      },
+      {
+        "inicio": "08:00",
+        "fin": "10:00",
+        "programa": "Hoy"
+      },
+      {
+        "inicio": "14:00",
+        "fin": "15:00",
+        "programa": "Noticiero - 1era. emisión"
+      },
+      {
+        "inicio": "21:00",
+        "fin": "22:00",
+        "programa": "Noticentro - Emisión estelar"
+      }
+    ],
+    "lunes_a_viernes": {
+      "01": {
+        "inicio": "00:00",
+        "fin": "05:00",
+        "programa": "Bloque de repeticiones"
+      },
+      "02": {
+        "inicio": "05:00",
+        "fin": "06:00",
+        "programa": "A la misma hora"
+      },
+      "03": {
+        "inicio": "06:00",
+        "fin": "08:00",
+        "programa": "Despierta RD"
+      },
+      "04": {
+        "inicio": "08:00",
+        "fin": "10:00",
+        "programa": "Hoy"
+      },
+      "05": {
+        "inicio": "10:00",
+        "fin": "11:00",
+        "programa": "Activando la mañana"
+      },
+      "06": {
+        "inicio": "11:00",
+        "fin": "12:00",
+        "programa": "Vive el espectáculo"
+      },
+      "07": {
+        "inicio": "12:00",
+        "fin": "14:00",
+        "programa": "La opción"
+      },
+      "08": {
+        "inicio": "14:00",
+        "fin": "15:00",
+        "programa": "Noticiero - 1era. emisión"
+      },
+      "09": {
+        "inicio": "15:00",
+        "fin": "16:00",
+        "programa": "Cita a ciegas"
+      },
+      "10": {
+        "inicio": "16:00",
+        "fin": "17:00",
+        "programa": "Mujer Casos de la Vida Real"
+      },
+      "11": {
+        "inicio": "17:00",
+        "fin": "18:00",
+        "programa": "Clase 406"
+      },
+      "12": {
+        "inicio": "18:00",
+        "fin": "19:00",
+        "programa": "Laura sin censura"
+      },
+      "13": {
+        "inicio": "19:00",
+        "fin": "20:00",
+        "programa": "Abismo de Pasión"
+      },
+      "14": {
+        "inicio": "20:00",
+        "fin": "21:00",
+        "programa": "Novelas"
+      },
+      "15": {
+        "inicio": "21:00",
+        "fin": "22:00",
+        "programa": "Noticentro - Emisión estelar"
+      },
+      "16": {
+        "inicio": "22:00",
+        "fin": "23:00",
+        "programa": "Too much x la noche!"
+      },
+      "17": {
+        "inicio": "23:00",
+        "fin": "23:30",
+        "programa": "El Reperpero"
+      },
+      "18": {
+        "inicio": "23:30",
+        "fin": "24:00",
+        "programa": "Bloque de repeticiones"
+      }
+    }
+  },
+  "Digital 15": {
+    "escaneo_solo_dias": "lunes_a_viernes",
+    "escaneo_solo_horarios": [
+      {
+        "inicio": "05:00",
+        "fin": "08:00",
+        "programa": "La opción de la mañana"
+      },
+      {
+        "inicio": "08:00",
+        "fin": "09:00",
+        "programa": "La revista del 15"
+      },
+      {
+        "inicio": "20:00",
+        "fin": "21:00",
+        "programa": "Noticiero Digital 15"
+      }
+    ],
+    "lunes_a_viernes": {
+      "01": {
+        "inicio": "00:00",
+        "fin": "05:00",
+        "programa": "Bloque de repeticiones"
+      },
+      "02": {
+        "inicio": "05:00",
+        "fin": "08:00",
+        "programa": "La opción de la mañana"
+      },
+      "03": {
+        "inicio": "08:00",
+        "fin": "09:00",
+        "programa": "La revista del 15"
+      },
+      "04": {
+        "inicio": "09:00",
+        "fin": "10:00",
+        "programa": "La belleza es mia"
+      },
+      "05": {
+        "inicio": "10:00",
+        "fin": "11:00",
+        "programa": "Ponte fit"
+      },
+      "06": {
+        "inicio": "11:00",
+        "fin": "12:00",
+        "programa": "Baila conmigo"
+      },
+      "07": {
+        "inicio": "12:00",
+        "fin": "15:00",
+        "programa": "Extremo a extremo"
+      },
+      "08": {
+        "inicio": "15:00",
+        "fin": "16:00",
+        "programa": "Como dice el dicho"
+      },
+      "09": {
+        "inicio": "16:00",
+        "fin": "17:00",
+        "programa": "Rebelde"
+      },
+      "10": {
+        "inicio": "17:00",
+        "fin": "18:00",
+        "programa": "Alondra"
+      },
+      "11": {
+        "inicio": "18:00",
+        "fin": "19:00",
+        "programa": "Portada digital"
+      },
+      "12": {
+        "inicio": "19:00",
+        "fin": "20:00",
+        "programa": "Echando el pulso"
+      },
+      "13": {
+        "inicio": "20:00",
+        "fin": "21:00",
+        "programa": "Noticiero Digital 15"
+      },
+      "14": {
+        "inicio": "21:00",
+        "fin": "22:00",
+        "programa": "Como dice el dicho"
+      },
+      "15": {
+        "inicio": "22:00",
+        "fin": "23:00",
+        "programa": "Más noche"
+      },
+      "16": {
+        "inicio": "23:00",
+        "fin": "24:00",
+        "programa": "La 3ra en discordia"
+      }
+    }
+  },
+  "CDN": {
+    "lunes_a_viernes": {
+      "01": {
+        "inicio": "00:00",
+        "fin": "01:00",
+        "programa": "Noticiario CDN - Fin semana"
+      },
+      "02": {
+        "inicio": "01:00",
+        "fin": "02:00",
+        "programa": "Coloquios"
+      },
+      "03": {
+        "inicio": "02:00",
+        "fin": "03:00",
+        "programa": "Noticiario CDN - Fin semana"
+      },
+      "04": {
+        "inicio": "03:00",
+        "fin": "03:30",
+        "programa": "Agenda climática"
+      },
+      "05": {
+        "inicio": "03:30",
+        "fin": "04:00",
+        "programa": "El informe Kliksberg"
+      },
+      "06": {
+        "inicio": "04:00",
+        "fin": "05:00",
+        "programa": "Finjus"
+      },
+      "07": {
+        "inicio": "05:00",
+        "fin": "06:00",
+        "programa": "Noticiario CDN - Fin semana"
+      },
+      "08": {
+        "inicio": "06:00",
+        "fin": "07:00",
+        "programa": "Noticias 6 AM"
+      },
+      "09": {
+        "inicio": "07:00",
+        "fin": "09:00",
+        "programa": "Despierta con CDN"
+      },
+      "10": {
+        "inicio": "09:00",
+        "fin": "10:00",
+        "programa": "Conversando con Ana Simó"
+      },
+      "11": {
+        "inicio": "10:00",
+        "fin": "10:30",
+        "programa": "En forma"
+      },
+      "12": {
+        "inicio": "10:30",
+        "fin": "11:00",
+        "programa": "Bienestar al día"
+      },
+      "13": {
+        "inicio": "11:00",
+        "fin": "11:30",
+        "programa": "Visión futuro"
+      },
+      "14": {
+        "inicio": "11:30",
+        "fin": "12:00",
+        "programa": "¿Cómo te afecta?"
+      },
+      "15": {
+        "inicio": "12:00",
+        "fin": "13:00",
+        "programa": "Noticias ahora"
+      },
+      "16": {
+        "inicio": "13:00",
+        "fin": "14:30",
+        "programa": "Jose Gutierrez en CDN"
+      },
+      "17": {
+        "inicio": "14:30",
+        "fin": "15:00",
+        "programa": "Ahora más"
+      },
+      "18": {
+        "inicio": "15:00",
+        "fin": "16:00",
+        "programa": "Tú Opinas en CDN"
+      },
+      "19": {
+        "inicio": "16:00",
+        "fin": "16:30",
+        "programa": "Famosos Inside"
+      },
+      "20": {
+        "inicio": "16:30",
+        "fin": "17:00",
+        "programa": "Agenda Noticiosa"
+      },
+      "21": {
+        "inicio": "17:00",
+        "fin": "17:30",
+        "programa": "Agenda climática"
+      },
+      "22": {
+        "inicio": "17:30",
+        "fin": "18:00",
+        "programa": "Todo Deportes"
+      },
+      "23": {
+        "inicio": "18:00",
+        "fin": "19:00",
+        "programa": "El Psiquiatra en línea"
+      },
+      "24": {
+        "inicio": "19:00",
+        "fin": "20:00",
+        "programa": "Red de noticias"
+      },
+      "25": {
+        "inicio": "20:00",
+        "fin": "20:55",
+        "programa": "Más que noticias"
+      },
+      "26": {
+        "inicio": "20:55",
+        "fin": "21:00",
+        "programa": "Loto de Leidsa"
+      },
+      "27": {
+        "inicio": "21:00",
+        "fin": "22:00",
+        "programa": "Enfoque Final"
+      },
+      "28": {
+        "inicio": "22:00",
+        "fin": "23:00",
+        "programa": "Reporte Especial"
+      },
+      "29": {
+        "inicio": "23:00",
+        "fin": "24:00",
+        "programa": "Tú opinas Resumen final"
+      }
+    }
+  },
+  "TRA": {
+    "lunes_a_viernes": {
+      "01": {
+        "inicio": "00:00",
+        "fin": "00:55",
+        "programa": "El Demócrata"
+      },
+      "02": {
+        "inicio": "05:00",
+        "fin": "05:55",
+        "programa": "Espacio Informativo"
+      },
+      "03": {
+        "inicio": "06:00",
+        "fin": "06:55",
+        "programa": "El Demócrata"
+      },
+      "04": {
+        "inicio": "07:00",
+        "fin": "07:55",
+        "programa": "El Demócrata"
+      },
+      "05": {
+        "inicio": "08:00",
+        "fin": "08:55",
+        "programa": "Radar Matutino"
+      },
+      "06": {
+        "inicio": "09:00",
+        "fin": "09:55",
+        "programa": "TRA En Vivo"
+      },
+      "07": {
+        "inicio": "10:00",
+        "fin": "10:55",
+        "programa": "TRA En Vivo"
+      },
+      "08": {
+        "inicio": "11:00",
+        "fin": "11:55",
+        "programa": "La Cosa Como Es"
+      },
+      "09": {
+        "inicio": "12:00",
+        "fin": "12:55",
+        "programa": "Tiempo Medido"
+      },
+      "10": {
+        "inicio": "13:00",
+        "fin": "13:55",
+        "programa": "La Hora de Consuelo"
+      },
+      "11": {
+        "inicio": "14:00",
+        "fin": "14:55",
+        "programa": "Soberanía Popular TV"
+      },
+      "12": {
+        "inicio": "15:00",
+        "fin": "15:55",
+        "programa": "Notoriedad TV"
+      },
+      "13": {
+        "inicio": "16:00",
+        "fin": "16:55",
+        "programa": "Al Detalle"
+      },
+      "14": {
+        "inicio": "17:00",
+        "fin": "17:55",
+        "programa": "El Poder de la Tarde"
+      },
+      "15": {
+        "inicio": "18:00",
+        "fin": "18:55",
+        "programa": "El Poder de la Tarde"
+      },
+      "16": {
+        "inicio": "19:00",
+        "fin": "19:55",
+        "programa": "Ideas Encontradas"
+      },
+      "17": {
+        "inicio": "20:00",
+        "fin": "20:55",
+        "programa": "Nosotros a las 8"
+      },
+      "18": {
+        "inicio": "21:00",
+        "fin": "21:55",
+        "programa": "Tiempo de Diálogo"
+      },
+      "19": {
+        "inicio": "22:00",
+        "fin": "22:55",
+        "programa": "Un Santo Entre Mujeres"
+      },
+      "20": {
+        "inicio": "23:00",
+        "fin": "23:55",
+        "programa": "Tiro al Blanco Convite"
+      }
+    }
+  },
+  "Teleuniverso": {
+    "escaneo_solo_dias": "lunes_a_viernes",
+    "escaneo_solo_horarios": [
+      {
+        "inicio": "05:00",
+        "fin": "06:00",
+        "programa": "Mañana mañera"
+      },
+      {
+        "inicio": "06:00",
+        "fin": "08:00",
+        "programa": "La hora estelar"
+      },
+      {
+        "inicio": "08:00",
+        "fin": "09:00",
+        "programa": "El cafecito"
+      },
+      {
+        "inicio": "09:00",
+        "fin": "10:00",
+        "programa": "Faia radio"
+      },
+      {
+        "inicio": "13:05",
+        "fin": "14:30",
+        "programa": "Teleuniverso al día"
+      },
+      {
+        "inicio": "22:00",
+        "fin": "22:30",
+        "programa": "Noticiero Universal"
+      },
+      {
+        "inicio": "22:30",
+        "fin": "24:00",
+        "programa": "Las noches con Bélgica"
+      }
+    ],
+    "lunes_a_viernes": {
+      "01": {
+        "inicio": "00:00",
+        "fin": "05:00",
+        "programa": "Retransmisión Programación regular"
+      },
+      "02": {
+        "inicio": "05:00",
+        "fin": "06:00",
+        "programa": "Mañana mañera"
+      },
+      "03": {
+        "inicio": "06:00",
+        "fin": "08:00",
+        "programa": "La hora estelar"
+      },
+      "04": {
+        "inicio": "08:00",
+        "fin": "09:00",
+        "programa": "El cafecito"
+      },
+      "05": {
+        "inicio": "09:00",
+        "fin": "10:00",
+        "programa": "Faia radio"
+      },
+      "06": {
+        "inicio": "10:00",
+        "fin": "11:00",
+        "programa": "Como en casa"
+      },
+      "07": {
+        "inicio": "11:00",
+        "fin": "11:30",
+        "programa": "29 minutos"
+      },
+      "08": {
+        "inicio": "11:30",
+        "fin": "12:47",
+        "programa": "Ustedes y nosotros"
+      },
+      "09": {
+        "inicio": "12:47",
+        "fin": "12:55",
+        "programa": "Pregúntale a Juan"
+      },
+      "10": {
+        "inicio": "12:55",
+        "fin": "13:05",
+        "programa": "Loto real"
+      },
+      "11": {
+        "inicio": "13:05",
+        "fin": "14:30",
+        "programa": "Teleuniverso al día"
+      },
+      "12": {
+        "inicio": "14:30",
+        "fin": "15:00",
+        "programa": "Opción NY"
+      },
+      "13": {
+        "inicio": "15:00",
+        "fin": "15:30",
+        "programa": "Info-deportivas"
+      },
+      "14": {
+        "inicio": "15:30",
+        "fin": "16:20",
+        "programa": "El sol de la tarde"
+      },
+      "15": {
+        "inicio": "16:20",
+        "fin": "17:00",
+        "programa": "El mega show"
+      },
+      "16": {
+        "inicio": "17:00",
+        "fin": "18:00",
+        "programa": "Politika por un tubo"
+      },
+      "17": {
+        "inicio": "18:00",
+        "fin": "19:00",
+        "programa": "Puntos y enfoques"
+      },
+      "18": {
+        "inicio": "19:00",
+        "fin": "20:00",
+        "programa": "Panorámica"
+      },
+      "19": {
+        "inicio": "22:00",
+        "fin": "22:30",
+        "programa": "Noticiero Universal"
+      },
+      "20": {
+        "inicio": "22:30",
+        "fin": "24:00",
+        "programa": "Las noches con Bélgica"
+      }
+    }
+  },
+  "Acento": {
+    "escaneo_solo_dias": "lunes_a_viernes",
+    "escaneo_solo_horarios": [
+      {
+        "inicio": "06:00",
+        "fin": "08:00",
+        "programa": "Acento mañana"
+      }
+    ],
+    "lunes_a_viernes": {
+      "01": {
+        "inicio": "06:00",
+        "fin": "08:00",
+        "programa": "Acento mañana"
+      }
+    }
+  },
+  "Canal Seis": {
+    "escaneo_solo_dias": "lunes_a_viernes",
+    "escaneo_solo_horarios": [
+      {
+        "inicio": "06:00",
+        "fin": "08:00",
+        "programa": "Canal Seis mañana"
+      }
+    ],
+    "lunes_a_viernes": {
+      "01": {
+        "inicio": "06:00",
+        "fin": "08:00",
+        "programa": "Canal Seis mañana"
+      }
+    }
+  },
+  "Telemedios": {
+    "escaneo_solo_dias": "lunes_a_viernes",
+    "escaneo_solo_horarios": [
+      {
+        "inicio": "06:00",
+        "fin": "08:00",
+        "programa": "Telemedios mañana"
+      },
+      {
+        "inicio": "13:00",
+        "fin": "14:00",
+        "programa": "Telemedios mediodía"
+      }
+    ],
+    "lunes_a_viernes": {
+      "01": {
+        "inicio": "06:00",
+        "fin": "08:00",
+        "programa": "Telemedios mañana"
+      },
+      "02": {
+        "inicio": "13:00",
+        "fin": "14:00",
+        "programa": "Telemedios mediodía"
+      }
+    }
+  }
+}

@@ -141,7 +141,7 @@
       },
       {
         "inicio": "06:00",
-        "fin": "08:00",
+        "fin": "09:00",
         "programa": "Matinal"
       },
       {
@@ -183,7 +183,7 @@
       },
       "06": {
         "inicio": "06:00",
-        "fin": "08:00",
+        "fin": "09:00",
         "programa": "Matinal"
       },
       "07": {
@@ -557,7 +557,7 @@
     "escaneo_solo_horarios": [
       {
         "inicio": "06:00",
-        "fin": "08:00",
+        "fin": "09:00",
         "programa": "El dia"
       },
       {
@@ -619,7 +619,7 @@
       },
       "08": {
         "inicio": "06:00",
-        "fin": "08:00",
+        "fin": "09:00",
         "programa": "El dia"
       },
       "09": {
@@ -724,7 +724,7 @@
     "escaneo_solo_horarios": [
       {
         "inicio": "06:00",
-        "fin": "08:00",
+        "fin": "09:00",
         "programa": "Despierta RD"
       },
       {
@@ -756,7 +756,7 @@
       },
       "03": {
         "inicio": "06:00",
-        "fin": "08:00",
+        "fin": "09:00",
         "programa": "Despierta RD"
       },
       "04": {
@@ -1211,7 +1211,7 @@
       },
       {
         "inicio": "06:00",
-        "fin": "08:00",
+        "fin": "09:00",
         "programa": "La hora estelar"
       },
       {
@@ -1248,7 +1248,7 @@
       },
       "03": {
         "inicio": "06:00",
-        "fin": "08:00",
+        "fin": "09:00",
         "programa": "La hora estelar"
       },
       "04": {
@@ -1343,7 +1343,7 @@
     "escaneo_solo_horarios": [
       {
         "inicio": "06:00",
-        "fin": "08:00",
+        "fin": "09:00",
         "programa": "Acento mañana"
       },
       {
@@ -1360,7 +1360,7 @@
     "lunes_a_viernes": {
       "01": {
         "inicio": "06:00",
-        "fin": "08:00",
+        "fin": "09:00",
         "programa": "Acento mañana"
       }
     }
@@ -1370,7 +1370,7 @@
     "escaneo_solo_horarios": [
       {
         "inicio": "06:00",
-        "fin": "08:00",
+        "fin": "09:00",
         "programa": "Canal Seis mañana"
       },
       {
@@ -1387,7 +1387,7 @@
     "lunes_a_viernes": {
       "01": {
         "inicio": "06:00",
-        "fin": "08:00",
+        "fin": "09:00",
         "programa": "Canal Seis mañana"
       }
     }
@@ -1397,7 +1397,7 @@
     "escaneo_solo_horarios": [
       {
         "inicio": "06:00",
-        "fin": "08:00",
+        "fin": "09:00",
         "programa": "Telemedios mañana"
       },
       {
@@ -1414,7 +1414,7 @@
     "lunes_a_viernes": {
       "01": {
         "inicio": "06:00",
-        "fin": "08:00",
+        "fin": "09:00",
         "programa": "Telemedios mañana"
       },
       "02": {

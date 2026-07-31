@@ -1,9 +1,9 @@
-# Grabaciones — Video Analyzer Pro v5.1
+# Grabaciones — Video Analyzer Pro v5.2
 
 Aplicación de **análisis de video con IA** (Streamlit): busca términos en grabaciones, genera clips, transcribe con Whisper / APIs y envía resultados a **Telegram**, **webhooks**, **correo (Brevo)**, **Google Drive**, **Cloudinary**, **Cloudflare R2** (opcional) y **Supabase**, con soporte **multi-cliente** (cada término puede ir a destinos distintos).
 
-**Versión actual:** **5.1** (`appMonitoreo.py`, tag Git `v5.1`).  
-**Versión anterior en GitHub:** **v5.0** (2026-07-31).
+**Versión actual:** **5.2** (`appMonitoreo.py`, tag Git `v5.2`).  
+**Versión anterior en GitHub:** **v5.1** (2026-07-31).
 
 ---
 
@@ -237,6 +237,53 @@ Uso interno / proyecto personal salvo que indiques otra licencia. Las marcas cit
 ---
 
 ## 📌 Cambios automáticos
+
+- [2026-07-31] FEAT: Video Analyzer v5.2
+  - Búsqueda de términos solo en transcripción; Intrant activo (cascos, motoristas, accidentes de tránsito).
+  - Correos con titular Intrant; no dejar videos <8MB atascados; mañana de escaneo 06:00–09:00.
+
+- [2026-07-31] MOD: monitoreo activo = Intrant (no Edesur)
+  - Solo Intrant tiene `incluir_en_analisis`. Fallbacks de correo/cliente usan Intrant, no Edesur.
+  - Titular del correo: “Sistema de Alerta de Medios de Intrant”.
+
+- [2026-07-31] FIX: titular del correo según cliente (Intrant / Edesur / …)
+  - La plantilla HTML decía siempre “Sistema de Alerta de Medios de Edesur”.
+  - Ahora usa el cliente del término: Intrant → “… de Intrant”, etc.
+
+- [2026-07-31] FEAT: término Intrant `accidentes de transito`
+  - También aliases: accidente/accidentes de tránsito/tráfico.
+
+- [2026-07-31] FEAT: términos Intrant `cascos` y `motoristas`
+  - Añadidos en `clientes_config.json` y `terminos_guardados.json` (cliente Intrant).
+  - Aliases: `casco` / `motorista` (singular).
+
+- [2026-07-31] MOD: búsqueda de términos solo en la transcripción (como antes)
+  - Se quitó la búsqueda en título/nombre del archivo.
+  - Flujo: Whisper → buscar término en texto → segmento → IA → coincidencia o tangencial.
+
+- [2026-07-31] FIX: no dejar videos sin procesar en la carpeta
+  - Antes: archivos &lt; 8 MB se ignoraban para siempre (ej. Acento 6,4 MB y MP4 de 28 bytes).
+  - Ahora: si ya no está grabando (≥90 s sin cambios) → se procesa (&gt;100 KB) o se borra (corrupto).
+  - Si ya está en `procesados.log` pero sigue en la raíz → se mueve a `procesados/`.
+  - Mañana de escaneo ampliada a **06:00–09:00** (antes cortaba a las 08:00).
+
+- [2026-07-31] FIX: lógica de reporte coincidencia vs tangencial
+  - **Coincidencia** = término en el **audio** + clip aceptado (relevancia/verify).
+  - **Tangencial** = solo en título, rechazo IA, baja relevancia, sin segmento usable, o clip que no verifica el término.
+  - Ya no se fuerza “coincidencia” por aparecer en el nombre del archivo; el título avisa por canal tangencial.
+  - Dedupe ±60s solo por el mismo término y solo tras confirmar coincidencia (no bloquea tras un descarte).
+  - Aliases Intrant: sin `el entran` (evita falsos positivos con “entrar”).
+
+- [2026-07-31] FIX: prioritarios Intrant no se desechan si la IA marca tangencial
+  - Si `morrison` / Intrant está en título o es prioritario y el modelo rechaza el segmento, se genera clip mecánico igual (antes iba a tangencial y se perdía).
+
+- [2026-07-31] FIX: detectar términos también en el título/nombre del archivo
+  - Caso YouTube `Milton_Morrison_… [uCEIYppIpDs]`: Whisper no escribió «morrison» (dijo «el entran»), y solo se buscaba en audio.
+  - Intrant (`morrison`, `milton morrison`, `intrant`, …) pasan a términos prioritarios.
+  - Aliases Whisper: `el entran` / `el entrant` → intrant.
+
+- [2026-07-31] MOD: ventana 06:00–09:00 sin filtro de horario
+  - Si el reloj del PC está entre 6 y 9 am, se procesan **todos** los videos (igual que fin de semana).
 
 - [2026-07-31] FEAT: Video Analyzer v5.1
   - Gemini: reemplazo de `gemini-3-pro-preview` (apagado) por `gemini-2.5-flash-lite` (más barato; `GEMINI_MODEL` en `.env`).

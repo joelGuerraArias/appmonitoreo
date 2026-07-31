@@ -16,6 +16,16 @@
         "inicio": "09:00",
         "fin": "10:00",
         "programa": "Uno + Uno"
+      },
+      {
+        "inicio": "12:00",
+        "fin": "15:00",
+        "programa": "Bloque mediodía (12:00-15:00)"
+      },
+      {
+        "inicio": "21:00",
+        "fin": "24:00",
+        "programa": "Bloque noche (21:00-00:00)"
       }
     ],
     "lunes_a_viernes": {
@@ -135,14 +145,14 @@
         "programa": "Matinal"
       },
       {
-        "inicio": "14:00",
+        "inicio": "12:00",
         "fin": "15:00",
-        "programa": "Noticias Telemicro"
+        "programa": "Noticias Telemicro / mediodía 12-15"
       },
       {
-        "inicio": "22:00",
-        "fin": "23:00",
-        "programa": "Noticias Telemicro"
+        "inicio": "21:00",
+        "fin": "24:00",
+        "programa": "Noticias Telemicro / noche 21-00"
       }
     ],
     "lunes_a_viernes": {
@@ -272,14 +282,14 @@
         "programa": "AN7 Revista"
       },
       {
-        "inicio": "13:00",
-        "fin": "14:00",
-        "programa": "AN7 Meridiano"
+        "inicio": "12:00",
+        "fin": "15:00",
+        "programa": "AN7 Meridiano / mediodía 12-15"
       },
       {
         "inicio": "21:00",
-        "fin": "22:00",
-        "programa": "AN7 - 2da. emisión"
+        "fin": "24:00",
+        "programa": "AN7 - 2da. emisión / noche 21-00"
       }
     ],
     "lunes_a_viernes": {
@@ -424,9 +434,9 @@
         "programa": "Hoy Mismo"
       },
       {
-        "inicio": "14:00",
+        "inicio": "12:00",
         "fin": "15:00",
-        "programa": "Noticias SIN - 1ra emisión"
+        "programa": "Noticias SIN - 1ra emisión / mediodía 12-15"
       },
       {
         "inicio": "19:00",
@@ -434,9 +444,9 @@
         "programa": "Noticias y mucho más"
       },
       {
-        "inicio": "22:00",
-        "fin": "23:00",
-        "programa": "Noticias SIN - Edición estelar"
+        "inicio": "21:00",
+        "fin": "24:00",
+        "programa": "Noticias SIN - Edición estelar / noche 21-00"
       }
     ],
     "lunes_a_viernes": {
@@ -556,9 +566,9 @@
         "programa": "Telematutino 11"
       },
       {
-        "inicio": "13:00",
-        "fin": "13:30",
-        "programa": "Telenoticias - Emisión vespertina"
+        "inicio": "12:00",
+        "fin": "15:00",
+        "programa": "Telenoticias - Emisión vespertina / mediodía 12-15"
       },
       {
         "inicio": "17:00",
@@ -566,9 +576,9 @@
         "programa": "Telenoticias - Emisión vespertina"
       },
       {
-        "inicio": "22:00",
-        "fin": "23:00",
-        "programa": "Telenoticias - Emisión estelar"
+        "inicio": "21:00",
+        "fin": "24:00",
+        "programa": "Telenoticias - Emisión estelar / noche 21-00"
       }
     ],
     "lunes_a_viernes": {
@@ -723,14 +733,14 @@
         "programa": "Hoy"
       },
       {
-        "inicio": "14:00",
+        "inicio": "12:00",
         "fin": "15:00",
-        "programa": "Noticiero - 1era. emisión"
+        "programa": "Noticiero - 1era. emisión / mediodía 12-15"
       },
       {
         "inicio": "21:00",
-        "fin": "22:00",
-        "programa": "Noticentro - Emisión estelar"
+        "fin": "24:00",
+        "programa": "Noticentro - Emisión estelar / noche 21-00"
       }
     ],
     "lunes_a_viernes": {
@@ -840,9 +850,19 @@
         "programa": "La revista del 15"
       },
       {
+        "inicio": "12:00",
+        "fin": "15:00",
+        "programa": "Bloque mediodía (12:00-15:00)"
+      },
+      {
         "inicio": "20:00",
         "fin": "21:00",
         "programa": "Noticiero Digital 15"
+      },
+      {
+        "inicio": "21:00",
+        "fin": "24:00",
+        "programa": "Bloque noche (21:00-00:00)"
       }
     ],
     "lunes_a_viernes": {
@@ -1205,19 +1225,14 @@
         "programa": "Faia radio"
       },
       {
-        "inicio": "13:05",
-        "fin": "14:30",
-        "programa": "Teleuniverso al día"
+        "inicio": "12:00",
+        "fin": "15:00",
+        "programa": "Teleuniverso al día / mediodía 12-15"
       },
       {
-        "inicio": "22:00",
-        "fin": "22:30",
-        "programa": "Noticiero Universal"
-      },
-      {
-        "inicio": "22:30",
+        "inicio": "21:00",
         "fin": "24:00",
-        "programa": "Las noches con Bélgica"
+        "programa": "Noticiero Universal / noche 21-00"
       }
     ],
     "lunes_a_viernes": {
@@ -1330,6 +1345,16 @@
         "inicio": "06:00",
         "fin": "08:00",
         "programa": "Acento mañana"
+      },
+      {
+        "inicio": "12:00",
+        "fin": "15:00",
+        "programa": "Bloque mediodía (12:00-15:00)"
+      },
+      {
+        "inicio": "21:00",
+        "fin": "24:00",
+        "programa": "Bloque noche (21:00-00:00)"
       }
     ],
     "lunes_a_viernes": {
@@ -1347,6 +1372,16 @@
         "inicio": "06:00",
         "fin": "08:00",
         "programa": "Canal Seis mañana"
+      },
+      {
+        "inicio": "12:00",
+        "fin": "15:00",
+        "programa": "Bloque mediodía (12:00-15:00)"
+      },
+      {
+        "inicio": "21:00",
+        "fin": "24:00",
+        "programa": "Bloque noche (21:00-00:00)"
       }
     ],
     "lunes_a_viernes": {
@@ -1366,9 +1401,14 @@
         "programa": "Telemedios mañana"
       },
       {
-        "inicio": "13:00",
-        "fin": "14:00",
-        "programa": "Telemedios mediodía"
+        "inicio": "12:00",
+        "fin": "15:00",
+        "programa": "Telemedios mediodía / mediodía 12-15"
+      },
+      {
+        "inicio": "21:00",
+        "fin": "24:00",
+        "programa": "Bloque noche (21:00-00:00)"
       }
     ],
     "lunes_a_viernes": {

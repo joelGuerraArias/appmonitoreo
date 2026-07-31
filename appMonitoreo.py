@@ -442,6 +442,35 @@ if DEEPSEEK_API_KEY:
         logging.warning(f"[WARN] DeepSeek no inicializado: {_e_ds_init}")
         deepseek_client = None
 
+
+# Ollama Cloud — daemon local (127.0.0.1:11434) con modelos :cloud (requiere ollama signin)
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+OLLAMA_MODEL_GLM = os.getenv("OLLAMA_MODEL_GLM", "glm-5.2:cloud")
+OLLAMA_MODEL_KIMI = os.getenv("OLLAMA_MODEL_KIMI", "kimi-k2.7-code:cloud")
+OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "")
+ollama_client = None
+try:
+    ollama_client = openai.OpenAI(
+        api_key=OLLAMA_API_KEY or "ollama",
+        base_url=f"{OLLAMA_BASE_URL}/v1",
+        timeout=180.0,
+    )
+    logging.info(
+        f"[OK] Cliente Ollama ({OLLAMA_BASE_URL}) — GLM: {OLLAMA_MODEL_GLM}, Kimi: {OLLAMA_MODEL_KIMI}"
+    )
+except Exception as _e_ollama_init:
+    logging.warning(f"[WARN] Ollama no inicializado: {_e_ollama_init}")
+    ollama_client = None
+
+MOTORES_IA_SESION = {
+    "ollama_kimi": {"label": "Ollama Cloud — Kimi K2.7 (predeterminado)", "model": OLLAMA_MODEL_KIMI},
+    "ollama_glm": {"label": "Ollama Cloud — GLM 5.2", "model": OLLAMA_MODEL_GLM},
+    "gemini": {"label": "Gemini 3.5 Flash → GPT-4o", "tipo": "gemini"},
+    "deepseek": {"label": "DeepSeek (último fallback)", "tipo": "deepseek"},
+}
+CADENA_ANALISIS_CLIPS = ("ollama_kimi", "ollama_glm", "gemini", "deepseek")
+CADENA_ANALISIS_TANGENCIALES = ("ollama_kimi", "ollama_glm", "deepseek")
+
 # === CONFIGURACIÓN GOOGLE DRIVE (desde variables de entorno) ===
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', '')
 GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET', '')
@@ -1615,6 +1644,396 @@ def enriquecer_motivos_tangenciales_deepseek(items_list, func_name="enriquecer_m
             except Exception as e_one:
                 log_warning(f"DeepSeek tangencial ítem orig_idx={orig_idx} sin enriquecer: {e_one}", func_name)
         log_info(f"DeepSeek tangenciales: enriquecidos {n_ok}/{len(pend_orig_idx)} pendientes de {len(items_list)} (individual)", func_name)
+
+
+def ia_motor_ollama_activo():
+    """True si el motor preferido de la sesión es un modelo Ollama (Kimi/GLM)."""
+    motor = str(st.session_state.get("ia_motor_sesion", "ollama_kimi"))
+    return motor.startswith("ollama_")
+
+
+def obtener_etiqueta_motor_sesion():
+    motor = st.session_state.get("ia_motor_sesion", "ollama_kimi")
+    return MOTORES_IA_SESION.get(motor, {}).get("label", motor)
+
+
+def obtener_model_tag_motor_sesion():
+    motor = st.session_state.get("ia_motor_sesion", "ollama_kimi")
+    return MOTORES_IA_SESION.get(motor, {}).get("model") or OLLAMA_MODEL_KIMI
+
+
+def _cadena_analisis_desde_preferido(cadena=CADENA_ANALISIS_CLIPS):
+    """Recorta la cadena fija a partir del motor preferido de la sesión."""
+    preferido = str(st.session_state.get("ia_motor_sesion", "ollama_kimi"))
+    if preferido not in cadena:
+        if "deepseek" in cadena:
+            return ["deepseek"]
+        preferido = "ollama_kimi"
+    idx = cadena.index(preferido)
+    return list(cadena[idx:])
+
+
+def verificar_ollama_disponible(model_tag=None):
+    """Ping al daemon Ollama; model_tag opcional (solo log)."""
+    try:
+        r = requests.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=8)
+        ok = r.status_code == 200
+        if ok and model_tag:
+            log_info(f"Ollama disponible; modelo preferido: {model_tag}", "verificar_ollama_disponible")
+        return ok
+    except Exception as e:
+        log_warning(f"Ollama no disponible ({OLLAMA_BASE_URL}): {e}", "verificar_ollama_disponible")
+        return False
+
+
+def _ollama_chat(model, system_prompt, user_prompt, temperature=0.2, max_tokens=800):
+    if not ollama_client:
+        raise RuntimeError("Cliente Ollama no inicializado")
+    resp = ollama_client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        temperature=temperature,
+        max_tokens=max_tokens,
+    )
+    return (resp.choices[0].message.content or "").strip()
+
+
+def _deepseek_chat(system_prompt, user_prompt, temperature=0.2, max_tokens=800):
+    if not deepseek_client:
+        raise RuntimeError("Cliente DeepSeek no inicializado")
+    resp = deepseek_client.chat.completions.create(
+        model=DEEPSEEK_MODEL,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        temperature=temperature,
+        max_tokens=max_tokens,
+    )
+    return (resp.choices[0].message.content or "").strip()
+
+
+def _limpiar_json_respuesta_modelo(texto):
+    raw = (texto or "").strip()
+    raw = raw.replace("```json", "").replace("```", "").strip()
+    if raw.startswith("```"):
+        raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.IGNORECASE)
+        raw = re.sub(r"\s*```\s*$", "", raw)
+    return raw
+
+
+def _prompt_segmento_analisis(termino_encontrado, timestamp_coincidencia, duracion_maxima, texto):
+    mm, ss = int(timestamp_coincidencia // 60), int(timestamp_coincidencia % 60)
+    user = f"""Eres editor de video. Encuentra el SEGMENTO donde "{termino_encontrado}" es el TEMA CENTRAL.
+
+TIMESTAMP DETECCIÓN: {mm}:{ss:02d} ({timestamp_coincidencia:.1f}s)
+DURACIÓN REQUERIDA: ~{duracion_maxima}s
+
+TRANSCRIPCIÓN:
+{texto}
+
+Responde SOLO JSON:
+Si apruebas: {{"rechazar": false, "inicio_segundos": N, "fin_segundos": N, "duracion_segundos": N, "razon": "...", "idea_central": "..."}}
+Si rechazas (tangencial): {{"rechazar": true, "razon": "..."}}
+"""
+    if termino_requiere_educacion_escolar_rd_exclusiva(termino_encontrado):
+        user += "\n" + _suffix_prompt_educacion_escolar_rd()
+    return user
+
+
+def _parse_resultado_segmento_json(raw, termino_encontrado, timestamp_coincidencia, duracion_maxima, etiqueta):
+    resultado = json.loads(_limpiar_json_respuesta_modelo(raw))
+    if resultado.get("rechazar", False):
+        razon = resultado.get("razon", "Mención tangencial")
+        _guardar_razon_rechazo_segmento_ia(str(razon))
+        st.warning(f"🚫 **{etiqueta}:** {razon}")
+        return None
+    inicio = max(0.0, float(resultado.get("inicio_segundos", timestamp_coincidencia - 30)))
+    fin = float(resultado.get("fin_segundos", timestamp_coincidencia + 30))
+    if fin - inicio > duracion_maxima:
+        fin = inicio + duracion_maxima
+    if fin - inicio < 60:
+        centro = (inicio + fin) / 2
+        inicio = max(0.0, centro - 30)
+        fin = centro + 30
+    out = {
+        "inicio": inicio,
+        "fin": fin,
+        "razon": resultado.get("razon", f"Segmento {etiqueta}"),
+        "duracion": fin - inicio,
+        "idea_central": resultado.get("idea_central", ""),
+    }
+    st.success(f"✅ **{etiqueta}:** Segmento {inicio:.1f}s–{fin:.1f}s ({out['duracion']:.1f}s)")
+    return out
+
+
+def determinar_segmento_inteligente_ollama(
+    transcripcion_con_timestamps, termino_encontrado, timestamp_coincidencia, duracion_maxima=90, model_tag=None
+):
+    _guardar_razon_rechazo_segmento_ia("")
+    model_tag = model_tag or obtener_model_tag_motor_sesion() or OLLAMA_MODEL_KIMI
+    contexto = []
+    for seg in transcripcion_con_timestamps or []:
+        ti = f"{int(seg['start']//60)}:{int(seg['start']%60):02d}"
+        contexto.append(f"[{ti}] {seg['text'].strip()}")
+    texto = "\n".join(contexto)
+    user = _prompt_segmento_analisis(termino_encontrado, timestamp_coincidencia, duracion_maxima, texto)
+    raw = _ollama_chat(model_tag, "Responde solo JSON válido.", user, temperature=0.2, max_tokens=700)
+    return _parse_resultado_segmento_json(
+        raw, termino_encontrado, timestamp_coincidencia, duracion_maxima, f"Ollama ({model_tag})"
+    )
+
+
+def determinar_segmento_inteligente_deepseek(
+    transcripcion_con_timestamps, termino_encontrado, timestamp_coincidencia, duracion_maxima=90
+):
+    _guardar_razon_rechazo_segmento_ia("")
+    if not deepseek_client:
+        raise RuntimeError("DeepSeek no configurado")
+    contexto = []
+    for seg in transcripcion_con_timestamps or []:
+        ti = f"{int(seg['start']//60)}:{int(seg['start']%60):02d}"
+        contexto.append(f"[{ti}] {seg['text'].strip()}")
+    texto = "\n".join(contexto)
+    user = _prompt_segmento_analisis(termino_encontrado, timestamp_coincidencia, duracion_maxima, texto)
+    raw = _deepseek_chat("Responde solo JSON válido.", user, temperature=0.2, max_tokens=700)
+    return _parse_resultado_segmento_json(
+        raw, termino_encontrado, timestamp_coincidencia, duracion_maxima, f"DeepSeek ({DEEPSEEK_MODEL})"
+    )
+
+
+def extraer_idea_general_segmento_ollama(
+    transcripcion_segmento, termino_encontrado, duracion_segundos, nombre_video="", model_tag=None
+):
+    model_tag = model_tag or obtener_model_tag_motor_sesion() or OLLAMA_MODEL_KIMI
+    default = {
+        "idea_general": f"Segmento relacionado con '{termino_encontrado}'",
+        "relevancia": "media",
+        "tema_principal": termino_encontrado,
+        "contexto": (transcripcion_segmento or "")[:200],
+        "es_relevante": True,
+        "que_se_dice": f"Mención de '{termino_encontrado}'",
+    }
+    user = f"""Analiza qué se dice sobre "{termino_encontrado}" en este segmento ({duracion_segundos:.1f}s).
+VIDEO: {nombre_video or 'n/a'}
+TRANSCRIPCIÓN:
+{transcripcion_segmento}
+
+Responde SOLO JSON:
+{{"es_relevante": true/false, "relevancia": "alta"|"media"|"baja", "que_se_dice": "...", "contexto": "...", "idea_general": "...", "tema_principal": "..."}}
+"""
+    if termino_requiere_educacion_escolar_rd_exclusiva(termino_encontrado):
+        user += "\n" + _suffix_prompt_educacion_escolar_rd()
+    raw = _ollama_chat(model_tag, "Analista de medios. Solo JSON.", user, temperature=0.3, max_tokens=500)
+    obj = json.loads(_limpiar_json_respuesta_modelo(raw))
+    default.update({
+        "idea_general": obj.get("idea_general") or default["idea_general"],
+        "relevancia": (obj.get("relevancia") or "media").lower(),
+        "tema_principal": obj.get("tema_principal") or termino_encontrado,
+        "contexto": obj.get("contexto") or default["contexto"],
+        "es_relevante": bool(obj.get("es_relevante", True)),
+        "que_se_dice": obj.get("que_se_dice") or default["que_se_dice"],
+    })
+    return default
+
+
+def extraer_idea_general_segmento_deepseek(
+    transcripcion_segmento, termino_encontrado, duracion_segundos, nombre_video=""
+):
+    if not deepseek_client:
+        raise RuntimeError("DeepSeek no configurado")
+    default = {
+        "idea_general": f"Segmento relacionado con '{termino_encontrado}'",
+        "relevancia": "media",
+        "tema_principal": termino_encontrado,
+        "contexto": (transcripcion_segmento or "")[:200],
+        "es_relevante": True,
+        "que_se_dice": f"Mención de '{termino_encontrado}'",
+    }
+    user = f"""Analiza qué se dice sobre "{termino_encontrado}" en este segmento ({duracion_segundos:.1f}s).
+VIDEO: {nombre_video or 'n/a'}
+TRANSCRIPCIÓN:
+{transcripcion_segmento}
+
+Responde SOLO JSON:
+{{"es_relevante": true/false, "relevancia": "alta"|"media"|"baja", "que_se_dice": "...", "contexto": "...", "idea_general": "...", "tema_principal": "..."}}
+"""
+    if termino_requiere_educacion_escolar_rd_exclusiva(termino_encontrado):
+        user += "\n" + _suffix_prompt_educacion_escolar_rd()
+    raw = _deepseek_chat("Analista de medios. Solo JSON.", user, temperature=0.3, max_tokens=500)
+    obj = json.loads(_limpiar_json_respuesta_modelo(raw))
+    default.update({
+        "idea_general": obj.get("idea_general") or default["idea_general"],
+        "relevancia": (obj.get("relevancia") or "media").lower(),
+        "tema_principal": obj.get("tema_principal") or termino_encontrado,
+        "contexto": obj.get("contexto") or default["contexto"],
+        "es_relevante": bool(obj.get("es_relevante", True)),
+        "que_se_dice": obj.get("que_se_dice") or default["que_se_dice"],
+    })
+    return default
+
+
+def determinar_segmento_inteligente_sesion(
+    transcripcion_con_timestamps, termino_encontrado, timestamp_coincidencia, duracion_maxima=90
+):
+    """Cadena: Kimi → GLM → Gemini/GPT-4o → DeepSeek."""
+    func_name = "determinar_segmento_inteligente_sesion"
+    cadena = _cadena_analisis_desde_preferido(CADENA_ANALISIS_CLIPS)
+    last_err = None
+    for motor in cadena:
+        etiqueta = MOTORES_IA_SESION.get(motor, {}).get("label", motor)
+        try:
+            if motor == "ollama_kimi":
+                return determinar_segmento_inteligente_ollama(
+                    transcripcion_con_timestamps, termino_encontrado,
+                    timestamp_coincidencia, duracion_maxima, model_tag=OLLAMA_MODEL_KIMI,
+                )
+            if motor == "ollama_glm":
+                return determinar_segmento_inteligente_ollama(
+                    transcripcion_con_timestamps, termino_encontrado,
+                    timestamp_coincidencia, duracion_maxima, model_tag=OLLAMA_MODEL_GLM,
+                )
+            if motor == "gemini":
+                return determinar_segmento_inteligente_gemini(
+                    transcripcion_con_timestamps, termino_encontrado,
+                    timestamp_coincidencia, duracion_maxima,
+                )
+            if motor == "deepseek":
+                return determinar_segmento_inteligente_deepseek(
+                    transcripcion_con_timestamps, termino_encontrado,
+                    timestamp_coincidencia, duracion_maxima,
+                )
+        except Exception as e:
+            last_err = e
+            log_warning(f"{motor} falló (segmento): {e} — siguiente en cadena", func_name)
+            try:
+                st.warning(f"⚠️ {etiqueta} no respondió — siguiente (Kimi→GLM→Gemini/GPT-4o→DeepSeek).")
+            except Exception:
+                pass
+            continue
+    raise RuntimeError(f"Ningún motor de análisis respondió (segmento). Último: {last_err}")
+
+
+def extraer_idea_general_segmento_sesion(
+    transcripcion_segmento, termino_encontrado, duracion_segundos, nombre_video=""
+):
+    """Cadena: Kimi → GLM → Gemini/GPT-4o → DeepSeek."""
+    func_name = "extraer_idea_general_segmento_sesion"
+    cadena = _cadena_analisis_desde_preferido(CADENA_ANALISIS_CLIPS)
+    last_err = None
+    for motor in cadena:
+        etiqueta = MOTORES_IA_SESION.get(motor, {}).get("label", motor)
+        try:
+            if motor == "ollama_kimi":
+                return extraer_idea_general_segmento_ollama(
+                    transcripcion_segmento, termino_encontrado, duracion_segundos,
+                    nombre_video, model_tag=OLLAMA_MODEL_KIMI,
+                )
+            if motor == "ollama_glm":
+                return extraer_idea_general_segmento_ollama(
+                    transcripcion_segmento, termino_encontrado, duracion_segundos,
+                    nombre_video, model_tag=OLLAMA_MODEL_GLM,
+                )
+            if motor == "gemini":
+                return extraer_idea_general_segmento_gemini(
+                    transcripcion_segmento, termino_encontrado, duracion_segundos, nombre_video,
+                )
+            if motor == "deepseek":
+                return extraer_idea_general_segmento_deepseek(
+                    transcripcion_segmento, termino_encontrado, duracion_segundos, nombre_video,
+                )
+        except Exception as e:
+            last_err = e
+            log_warning(f"{motor} falló (idea): {e} — siguiente en cadena", func_name)
+            try:
+                st.warning(f"⚠️ {etiqueta} no respondió — siguiente (idea del clip).")
+            except Exception:
+                pass
+            continue
+    return {
+        "idea_general": f"Segmento relacionado con '{termino_encontrado}'",
+        "relevancia": "media",
+        "tema_principal": termino_encontrado,
+        "contexto": (transcripcion_segmento or "")[:200],
+        "es_relevante": True,
+        "que_se_dice": f"Mención de '{termino_encontrado}'",
+    }
+
+
+def _enriquecer_tangenciales_ollama_modelo(items_list, model_tag, func_name):
+    for it in items_list:
+        if isinstance(it, dict) and not (it.get("texto_evidencia") or "").strip():
+            it["texto_evidencia"] = (it.get("transcripcion_extracto") or "").strip()[:12000]
+    pend = [i for i, it in enumerate(items_list) if isinstance(it, dict) and not (it.get("motivo_sistema") or "").strip()]
+    if not pend:
+        return
+    prepared = []
+    for loc, orig in enumerate(pend):
+        it = items_list[orig]
+        ev = (it.get("texto_evidencia") or "")[:7000]
+        prepared.append({
+            "idx": loc,
+            "termino": (it.get("termino") or "").strip(),
+            "motivo_sistema": (it.get("motivo") or "Mención tangencial").strip(),
+            "transcripcion": ev,
+        })
+    system = (
+        'Eres analista de medios. Responde SOLO JSON array '
+        '[{"idx":N,"explicacion":"una frase en español"},...].'
+    )
+    raw = _ollama_chat(model_tag, system, json.dumps(prepared, ensure_ascii=False), temperature=0.3, max_tokens=1200)
+    arr = json.loads(_limpiar_json_respuesta_modelo(raw))
+    by_idx = {}
+    for x in arr if isinstance(arr, list) else []:
+        if isinstance(x, dict) and "idx" in x:
+            try:
+                by_idx[int(x["idx"])] = (x.get("explicacion") or "").strip()
+            except (TypeError, ValueError):
+                pass
+    n_ok = 0
+    for loc, orig in enumerate(pend):
+        it = items_list[orig]
+        expl = _tangencial_motivo_una_frase(by_idx.get(loc, ""))
+        if expl:
+            it["motivo_sistema"] = it.get("motivo", "")
+            it["motivo"] = expl
+            n_ok += 1
+    log_info(f"Ollama ({model_tag}) tangenciales: enriquecidos {n_ok}/{len(pend)}", func_name)
+    if n_ok == 0:
+        raise RuntimeError(f"{model_tag} no devolvió explicaciones útiles")
+
+
+def enriquecer_motivos_tangenciales_sesion(items_list, func_name="enriquecer_motivos_tangenciales_sesion"):
+    """Cadena tangenciales: Kimi → GLM → DeepSeek."""
+    if not items_list:
+        return
+    cadena = _cadena_analisis_desde_preferido(CADENA_ANALISIS_TANGENCIALES)
+    for motor in cadena:
+        etiqueta = MOTORES_IA_SESION.get(motor, {}).get("label", motor)
+        try:
+            if motor == "ollama_kimi":
+                if not ollama_client:
+                    raise RuntimeError("Cliente Ollama no inicializado")
+                _enriquecer_tangenciales_ollama_modelo(items_list, OLLAMA_MODEL_KIMI, func_name)
+                return
+            if motor == "ollama_glm":
+                if not ollama_client:
+                    raise RuntimeError("Cliente Ollama no inicializado")
+                _enriquecer_tangenciales_ollama_modelo(items_list, OLLAMA_MODEL_GLM, func_name)
+                return
+            if motor == "deepseek":
+                return enriquecer_motivos_tangenciales_deepseek(items_list, func_name=func_name)
+        except Exception as e:
+            log_warning(f"{motor} tangenciales falló: {e} — siguiente", func_name)
+            try:
+                st.warning(f"⚠️ {etiqueta} no enriqueció tangenciales — siguiente.")
+            except Exception:
+                pass
+            continue
+    return enriquecer_motivos_tangenciales_deepseek(items_list, func_name=func_name)
 
 
 def crear_plantilla_email_tangenciales_html(cliente, items_list, hora_ciclo, aviso_inmediato=False):
@@ -4488,7 +4907,7 @@ TRANSCRIPCIÓN COMPLETA:
 {transcripcion_completa}
 
 ===============================================
-GENERADO POR: Video Analyzer IA v4.0
+GENERADO POR: Video Analyzer IA v5.0
 ===============================================
 """
             
@@ -5229,7 +5648,7 @@ def generar_md_sesion_coincidencias(
         # ============================
         md.append(f"# 🎯 Reporte de Sesión - Coincidencias Detectadas")
         md.append(f"")
-        md.append(f"> **Video Analyzer IA v4.0** | Sesión: {fecha_legible}")
+        md.append(f"> **Video Analyzer IA v5.0** | Sesión: {fecha_legible}")
         md.append(f"")
         md.append(f"---")
         md.append(f"")
@@ -5414,7 +5833,7 @@ def generar_md_sesion_coincidencias(
         # ============================
         # PIE
         # ============================
-        md.append(f"_Reporte generado automáticamente por Video Analyzer IA v4.0 - {fecha_legible}_")
+        md.append(f"_Reporte generado automáticamente por Video Analyzer IA v5.0 - {fecha_legible}_")
         
         # === ESCRIBIR ARCHIVO ===
         contenido_final = "\n".join(md)
@@ -6246,7 +6665,7 @@ def generar_html_resumen_diario(coincidencias, cliente_nombre, corte_label, fech
         <!-- Footer -->
         <div style="background: #343a40; color: white; padding: 20px; border-radius: 0 0 16px 16px; text-align: center;">
             <p style="margin: 4px 0; opacity: 0.8; font-size: 13px;">
-                🤖 Resumen generado automáticamente por Video Analyzer IA v4.0
+                🤖 Resumen generado automáticamente por Video Analyzer IA v5.0
             </p>
             <p style="margin: 4px 0; opacity: 0.6; font-size: 12px;">
                 {datetime.now().strftime('%d/%m/%Y %H:%M:%S')} &middot; {cliente_nombre}
@@ -7006,7 +7425,7 @@ def enviar_clips_a_telegram(clips_generados, resumen, terminos_detectados, video
 📋 *RESUMEN EJECUTIVO:*
 {resumen}
 
-🌐 *Servidor:* Analizador de Videos IA v4.0
+🌐 *Servidor:* Analizador de Videos IA v5.0
 
 ⬇️ *Videos a continuación...*"""
         
@@ -7123,7 +7542,7 @@ def test_telegram_connection():
 
 ✅ Bot conectado correctamente
 ⏰ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-🤖 Analizador de Videos IA v4.0
+🤖 Analizador de Videos IA v5.0
 
 Este es un mensaje de prueba."""
     
@@ -7227,6 +7646,9 @@ def init_session_state():
         'mistral_total_tokens': 0,               # Tokens totales consumidos
         'mistral_total_transcripciones': 0,      # Número de transcripciones realizadas
         'intro_clip_enabled': INTRO_CLIP_ENABLED,
+        'ia_motor_sesion': 'ollama_kimi',
+        'ollama_activo_confirmado': True,
+        'sidebar_ollama_preferencia': 'ollama_kimi',
     }
     
     for key, value in defaults.items():
@@ -7486,7 +7908,12 @@ with col5:
     else:
         st.warning("📧 **Brevo** ⚠️\nNo configurado")
     
-st.title("🎬 Análisis Automático de Videos - Versión 3 ✅")
+st.title("🎬 Análisis Automático de Videos - Versión 5 ✅")
+st.info(
+    f"🧠 **v5.0** | Cadena: Kimi → GLM → Gemini/GPT-4o → DeepSeek. "
+    f"Preferido: **{obtener_etiqueta_motor_sesion()}**. "
+    "Lun–vie: horarios de escaneo (sidebar). Sáb/dom y CDN/TRA: todos."
+)
 st.markdown(f"📁 Carpeta: `{CARPETA_VIDEOS}` | 🌐 Webhook: Make.com | 📱 Telegram: @edesuralertas | ☁️ Google Drive: Activo | 📧 Brevo: Correos")
 st.info("⏱️ **Configuración de clips:** Por defecto genera clips de 1 minuto (30s antes + 30s después de cada coincidencia)")
 
@@ -8042,6 +8469,71 @@ with st.sidebar:
             on_change=_mk_save_analisis(_scid, _skey),
         )
     
+    # === Horarios de escaneo activos ===
+    st.markdown("---")
+    st.header("⏰ Horarios de escaneo (lun–vie)")
+    st.caption("Fin de semana: **todos**. Canales sin filtro (CDN, TRA…): **todos**.")
+    try:
+        _prog_path = _DIR_SCRIPT / "programacion_tv.json"
+        _prog = json.loads(_prog_path.read_text(encoding="utf-8")) if _prog_path.exists() else {}
+        _con_filtro = []
+        _sin_filtro = []
+        for _canal, _cfg in (_prog or {}).items():
+            _slots = (_cfg or {}).get("escaneo_solo_horarios") or []
+            if not _slots:
+                _sin_filtro.append(_canal)
+                continue
+            _lines = [f"{s.get('inicio','?')}–{s.get('fin','?')}" for s in _slots]
+            _con_filtro.append(f"**{_canal}:** " + ", ".join(_lines))
+        if _con_filtro:
+            with st.expander(f"Canales filtrados ({len(_con_filtro)})", expanded=False):
+                for _ln in _con_filtro:
+                    st.markdown(f"- {_ln}")
+        if _sin_filtro:
+            st.caption("Sin filtro: " + ", ".join(_sin_filtro))
+    except Exception as _e_hor:
+        st.caption(f"No se pudo leer programacion_tv.json: {_e_hor}")
+
+    st.markdown("---")
+    st.header("🧠 Motor de análisis")
+    st.caption("Default **Kimi**. Cadena: Kimi → GLM → Gemini/GPT-4o → DeepSeek.")
+    st.radio(
+        "Empezar la cadena en",
+        options=["ollama_kimi", "ollama_glm", "gemini"],
+        format_func=lambda x: {
+            "ollama_kimi": "Kimi K2.7 (default)",
+            "ollama_glm": "GLM 5.2",
+            "gemini": "Gemini → GPT-4o",
+        }.get(x, x),
+        key="sidebar_ollama_preferencia",
+        horizontal=True,
+    )
+    _col_oa, _col_ob = st.columns(2)
+    with _col_oa:
+        if st.button("Aplicar preferido", use_container_width=True):
+            _pref = st.session_state.get("sidebar_ollama_preferencia", "ollama_kimi")
+            if str(_pref).startswith("ollama_"):
+                _tag = OLLAMA_MODEL_GLM if _pref == "ollama_glm" else OLLAMA_MODEL_KIMI
+                if not verificar_ollama_disponible(_tag):
+                    st.error(f"Ollama no responde en `{OLLAMA_BASE_URL}`.")
+                else:
+                    st.session_state.ia_motor_sesion = _pref
+                    st.session_state.ollama_activo_confirmado = True
+                    st.success(f"Cadena desde: {MOTORES_IA_SESION[_pref]['label']}")
+                    st.rerun()
+            else:
+                st.session_state.ia_motor_sesion = "gemini"
+                st.session_state.ollama_activo_confirmado = False
+                st.success("Cadena desde: Gemini → GPT-4o → DeepSeek")
+                st.rerun()
+    with _col_ob:
+        if st.button("Reset a Kimi", use_container_width=True):
+            st.session_state.ia_motor_sesion = "ollama_kimi"
+            st.session_state.ollama_activo_confirmado = True
+            st.session_state.sidebar_ollama_preferencia = "ollama_kimi"
+            st.rerun()
+    st.caption(f"Activo: **{obtener_etiqueta_motor_sesion()}**")
+
     # === Contador de uso Mistral/Voxtral ===
     st.markdown("---")
     st.header("🧠 Uso Mistral / Voxtral")
@@ -12749,7 +13241,7 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                         f.write(f"Fecha creación: {datetime.now().isoformat()}\n")
                         f.write(f"Archivo origen: {rel} ({tipo_archivo})\n")
                         f.write(f"Términos encontrados: {', '.join(terminos_nombres)}\n")
-                        f.write(f"Generado por: Video Analyzer IA v4.0\n")
+                        f.write(f"Generado por: Video Analyzer IA v5.0\n")
             
                 # ========== GUARDAR TRANSCRIPCIÓN COMPLETA DEL VIDEO ==========
                 transcripcion_completa_path = os.path.join(archivo_main_dir, "TRANSCRIPCION_COMPLETA.txt")
@@ -12780,7 +13272,7 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                             f.write(f"- Total de palabras: {len(transcripcion_mistral.split())}\n")
                             f.write(f"- Total de caracteres: {len(transcripcion_mistral)}\n")
                             f.write(f"\n{'='*80}\n")
-                            f.write(f"✅ Generado automáticamente por Video Analyzer IA v4.0\n")
+                            f.write(f"✅ Generado automáticamente por Video Analyzer IA v5.0\n")
                     
                         log_info(f"✅ Transcripción completa guardada: {transcripcion_completa_path}", func_name)
                         if not mostrar_solo_relevantes:
@@ -12978,7 +13470,7 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                     
                         try:
                             # Llamar a GEMINI 3 PRO para determinar el segmento más lógico
-                            segmento_gemini = determinar_segmento_inteligente_gemini(
+                            segmento_gemini = determinar_segmento_inteligente_sesion(
                                 transcripcion_con_timestamps=segments_timestamps,
                                 termino_encontrado=termino,
                                 timestamp_coincidencia=momento_termino,
@@ -13032,7 +13524,7 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                                     )
                                 menciones_tangenciales_data.append(_item_tang)
                                 try:
-                                    enriquecer_motivos_tangenciales_deepseek(
+                                    enriquecer_motivos_tangenciales_sesion(
                                         [_item_tang], func_name=func_name
                                     )
                                 except Exception as e_enr:
@@ -13189,7 +13681,7 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                             # Llamar a GEMINI 3.0 para extraer idea general (con fallback a GPT-4o)
                             try:
                                 # Usar Gemini 3.0 como modelo principal
-                                resultado_gemini = extraer_idea_general_segmento_gemini(
+                                resultado_gemini = extraer_idea_general_segmento_sesion(
                                     transcripcion_segmento=transcripcion_segmento.strip(),
                                     termino_encontrado=termino,
                                     duracion_segundos=duracion_clip_real,
@@ -13258,7 +13750,7 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                                             )
                                         menciones_tangenciales_data.append(_item_tang)
                                         try:
-                                            enriquecer_motivos_tangenciales_deepseek(
+                                            enriquecer_motivos_tangenciales_sesion(
                                                 [_item_tang], func_name=func_name
                                             )
                                         except Exception as e_enr:
@@ -13887,7 +14379,7 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
     # Enriquecer motivos tangenciales con DeepSeek (in-place) antes de UI / Analisishoy / correo fin ciclo
     if menciones_tangenciales_data:
         try:
-            enriquecer_motivos_tangenciales_deepseek(
+            enriquecer_motivos_tangenciales_sesion(
                 menciones_tangenciales_data,
                 func_name="buscar_y_procesar_videos_post_ciclo",
             )

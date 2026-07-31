@@ -1,9 +1,9 @@
-# Grabaciones — Video Analyzer Pro v4.0
+# Grabaciones — Video Analyzer Pro v5.0
 
 Aplicación de **análisis de video con IA** (Streamlit): busca términos en grabaciones, genera clips, transcribe con Whisper / APIs y envía resultados a **Telegram**, **webhooks**, **correo (Brevo)**, **Google Drive**, **Cloudinary**, **Cloudflare R2** (opcional) y **Supabase**, con soporte **multi-cliente** (cada término puede ir a destinos distintos).
 
-**Versión actual:** **4.0** (`appMonitoreo.py`, tag Git `v4.0`).  
-**Versión anterior en GitHub:** Nora **v1.1** (2026-05-19).
+**Versión actual:** **5.0** (`appMonitoreo.py`, tag Git `v5.0`).  
+**Versión anterior en GitHub:** **v4.0** (2026-07-27).
 
 ---
 
@@ -237,6 +237,22 @@ Uso interno / proyecto personal salvo que indiques otra licencia. Las marcas cit
 ---
 
 ## 📌 Cambios automáticos
+
+- [2026-07-31] FEAT: Video Analyzer v5.0
+  - UI Versión 5 + banner de cadena IA; sidebar con horarios de escaneo activos.
+  - Cadena: Kimi → GLM → Gemini/GPT-4o → DeepSeek (Kimi default).
+  - Parrilla: bloques 12:00–15:00 y 21:00–24:00 en canales filtrados.
+
+- [2026-07-31] MOD: cadena de análisis Kimi → GLM → Gemini/GPT-4o → DeepSeek
+  - Kimi es el motor predeterminado al abrir la app (ya no Gemini).
+  - Si un motor falla, se pasa al siguiente automáticamente; DeepSeek es el último fallback.
+  - Tangenciales: Kimi → GLM → DeepSeek. Sidebar: elegir desde dónde empieza la cadena.
+
+- [2026-07-31] FEAT: restaurado selector Ollama (GLM / Kimi) en sidebar
+  - Se había perdido con un `git checkout` accidental; no se quitó a propósito.
+  - Sidebar: radio GLM 5.2 / Kimi K2.7 + Activar / Volver a Gemini / Probar conexión; lista de términos activos según `incluir_en_analisis`.
+  - Pipeline clips y tangenciales vía `*_sesion` (Ollama con fallback Gemini/DeepSeek).
+  - `env_template.txt`: variables `OLLAMA_*`.
 
 - [2026-06-08] FEAT: Ollama Cloud opcional en appMonitoreo (GLM 5.2 / Kimi K2.7)
   - Sidebar: radio + botón «Activar Ollama» / «Volver a Gemini»; Gemini sigue por defecto.
@@ -588,5 +604,16 @@ Documentación de lo implementado en `appMonitoreo.py` para evitar avisos repeti
 - [2026-07-27 09:20] DOCS: medios sin horario de escaneo
   - Canales **sin** `escaneo_solo_horarios` en `programacion_tv.json` (p. ej. CDN, TRA, Intrant) procesan **todos** los videos, a cualquier hora entre semana. Solo los que tienen parrilla de escaneo quedan filtrados.
   - `borrar_video_origen_permanente` rechaza cualquier ruta fuera de `CARPETA_VIDEOS` y solo permite extensiones de media.
+
+- [2026-07-29 11:50] FIX: Analisishoy dual-write restaurado + protección borrado
+  - `Analisishoy_YYYYMMDD.md` se escribe otra vez en **videos procesados** y espejo en **Desktop/informes** (se había perdido tras el revert).
+  - Al iniciar cada ciclo se crea el archivo del día aunque no haya coincidencias.
+  - El borrado permanente **nunca** toca `.md` ni archivos `Analisishoy*`.
+
+- [2026-07-30 12:35] FEAT: escaneo mediodía 12:00–15:00 en todos los canales filtrados
+  - Añadido bloque `12:00–15:00` a `escaneo_solo_horarios` (Teleantillas, Telemicro, Antena Latina, Color Vision, Telesistema, Telecentro, Digital 15, Teleuniverso, Acento, Canal Seis, Telemedios). Antes solo pasaban franjas de mañana (y pocos slots a las 14h), por eso se veían muchos videos y solo se procesaban unos pocos.
+
+- [2026-07-30 21:40] FEAT: escaneo noche 21:00–00:00 en todos los canales filtrados
+  - Añadido bloque `21:00–24:00` (9 pm a medianoche) a la parrilla de escaneo. Corregido `_hora_en_slot` para aceptar `fin: 24:00`.
 
 

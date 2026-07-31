@@ -34,6 +34,13 @@ CLOUDINARY_API_SECRET=YOUR_CLOUDINARY_API_SECRET
 # === DEEPSEEK (tangenciales + fallback IA) ===
 DEEPSEEK_API_KEY=YOUR_DEEPSEEK_API_KEY
 
+# === OLLAMA CLOUD (opcional: GLM 5.2 / Kimi K2.7 desde el sidebar) ===
+# Requiere ollama daemon local + `ollama signin` para modelos :cloud
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+OLLAMA_API_KEY=YOUR_OLLAMA_API_KEY
+OLLAMA_MODEL_GLM=glm-5.2:cloud
+OLLAMA_MODEL_KIMI=kimi-k2.7-code:cloud
+
 # === BREVO (SMTP) ===
 BREVO_SMTP_KEY=YOUR_BREVO_SMTP_KEY
 

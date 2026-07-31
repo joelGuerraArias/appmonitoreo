@@ -408,13 +408,15 @@ openai_client = openai.OpenAI(api_key=_openai_api_key) if _openai_api_key else N
 # Mistral
 mistral_api_key = os.getenv('MISTRAL_API_KEY', '')
 
-# Gemini 3.0
+# Gemini — gemini-3-pro-preview apagado (mar-2026). Default: el más barato disponible.
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
+# Precios (pago): 2.5-flash-lite $0.10/$0.40 (retira 2026-10-16) | 3.1-flash-lite $0.25/$1.50 | 3.5-flash-lite $0.30/$2.50
+GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash-lite').strip() or 'gemini-2.5-flash-lite'
 gemini_client = None
 if GEMINI_API_KEY:
     try:
         gemini_client = genai.Client(api_key=GEMINI_API_KEY)
-        logging.info("[OK] Cliente Gemini 3.0 inicializado correctamente")
+        logging.info(f"[OK] Cliente Gemini inicializado — modelo: {GEMINI_MODEL}")
     except Exception as e:
         logging.warning(f"[WARN] Error inicializando Gemini: {e}")
         gemini_client = None
@@ -465,7 +467,7 @@ except Exception as _e_ollama_init:
 MOTORES_IA_SESION = {
     "ollama_kimi": {"label": "Ollama Cloud — Kimi K2.7 (predeterminado)", "model": OLLAMA_MODEL_KIMI},
     "ollama_glm": {"label": "Ollama Cloud — GLM 5.2", "model": OLLAMA_MODEL_GLM},
-    "gemini": {"label": "Gemini 3.5 Flash → GPT-4o", "tipo": "gemini"},
+    "gemini": {"label": "Gemini 2.5 Flash-Lite → GPT-4o", "tipo": "gemini"},
     "deepseek": {"label": "DeepSeek (último fallback)", "tipo": "deepseek"},
 }
 CADENA_ANALISIS_CLIPS = ("ollama_kimi", "ollama_glm", "gemini", "deepseek")
@@ -4907,7 +4909,7 @@ TRANSCRIPCIÓN COMPLETA:
 {transcripcion_completa}
 
 ===============================================
-GENERADO POR: Video Analyzer IA v5.0
+GENERADO POR: Video Analyzer IA v5.1
 ===============================================
 """
             
@@ -5648,7 +5650,7 @@ def generar_md_sesion_coincidencias(
         # ============================
         md.append(f"# 🎯 Reporte de Sesión - Coincidencias Detectadas")
         md.append(f"")
-        md.append(f"> **Video Analyzer IA v5.0** | Sesión: {fecha_legible}")
+        md.append(f"> **Video Analyzer IA v5.1** | Sesión: {fecha_legible}")
         md.append(f"")
         md.append(f"---")
         md.append(f"")
@@ -5833,7 +5835,7 @@ def generar_md_sesion_coincidencias(
         # ============================
         # PIE
         # ============================
-        md.append(f"_Reporte generado automáticamente por Video Analyzer IA v5.0 - {fecha_legible}_")
+        md.append(f"_Reporte generado automáticamente por Video Analyzer IA v5.1 - {fecha_legible}_")
         
         # === ESCRIBIR ARCHIVO ===
         contenido_final = "\n".join(md)
@@ -6665,7 +6667,7 @@ def generar_html_resumen_diario(coincidencias, cliente_nombre, corte_label, fech
         <!-- Footer -->
         <div style="background: #343a40; color: white; padding: 20px; border-radius: 0 0 16px 16px; text-align: center;">
             <p style="margin: 4px 0; opacity: 0.8; font-size: 13px;">
-                🤖 Resumen generado automáticamente por Video Analyzer IA v5.0
+                🤖 Resumen generado automáticamente por Video Analyzer IA v5.1
             </p>
             <p style="margin: 4px 0; opacity: 0.6; font-size: 12px;">
                 {datetime.now().strftime('%d/%m/%Y %H:%M:%S')} &middot; {cliente_nombre}
@@ -7425,7 +7427,7 @@ def enviar_clips_a_telegram(clips_generados, resumen, terminos_detectados, video
 📋 *RESUMEN EJECUTIVO:*
 {resumen}
 
-🌐 *Servidor:* Analizador de Videos IA v5.0
+🌐 *Servidor:* Analizador de Videos IA v5.1
 
 ⬇️ *Videos a continuación...*"""
         
@@ -7542,7 +7544,7 @@ def test_telegram_connection():
 
 ✅ Bot conectado correctamente
 ⏰ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-🤖 Analizador de Videos IA v5.0
+🤖 Analizador de Videos IA v5.1
 
 Este es un mensaje de prueba."""
     
@@ -7908,9 +7910,9 @@ with col5:
     else:
         st.warning("📧 **Brevo** ⚠️\nNo configurado")
     
-st.title("🎬 Análisis Automático de Videos - Versión 5 ✅")
+st.title("🎬 Análisis Automático de Videos - Versión 5.1 ✅")
 st.info(
-    f"🧠 **v5.0** | Cadena: Kimi → GLM → Gemini/GPT-4o → DeepSeek. "
+    f"🧠 **v5.1** | Cadena: Kimi → GLM → Gemini/GPT-4o → DeepSeek. "
     f"Preferido: **{obtener_etiqueta_motor_sesion()}**. "
     "Lun–vie: horarios de escaneo (sidebar). Sáb/dom y CDN/TRA: todos."
 )
@@ -10912,11 +10914,11 @@ Si el término NO es el tema central (RECHAZAR):
 
 RESPONDE SOLO CON EL JSON:"""
 
-        # Llamar a Gemini 3 Pro
-        log_info("📡 Enviando solicitud a GEMINI 3 PRO para análisis de segmento...", func_name)
+        # Llamar a Gemini (modelo barato configurable vía GEMINI_MODEL)
+        log_info(f"📡 Enviando solicitud a Gemini ({GEMINI_MODEL}) para análisis de segmento...", func_name)
         
         response = gemini_client.models.generate_content(
-            model="gemini-3-pro-preview",  # Gemini 3 Pro (modelo más avanzado)
+            model=GEMINI_MODEL,
             contents=prompt,
             config={
                 "temperature": 0.2,  # Bajo para respuestas más consistentes
@@ -10982,7 +10984,7 @@ RESPONDE SOLO CON EL JSON:"""
         log_info(f"💡 Idea central: {idea_central[:100]}...", func_name)
         
         # Mostrar en UI
-        st.success(f"🌟 **Gemini 3 Pro:** Segmento inteligente: {inicio:.1f}s - {fin:.1f}s ({duracion_calculada:.1f}s)")
+        st.success(f"🌟 **Gemini ({GEMINI_MODEL}):** Segmento inteligente: {inicio:.1f}s - {fin:.1f}s ({duracion_calculada:.1f}s)")
         st.info(f"💡 **Razón:** {razon}")
         if idea_central:
             st.info(f"🎯 **Idea central sobre '{termino_encontrado}':** {idea_central}")
@@ -11378,11 +11380,11 @@ Responde ÚNICAMENTE estas preguntas sobre "{termino_encontrado}":
 
 RESPONDE SOLO CON EL JSON:"""
 
-        # Llamar a Gemini 3 Pro
-        log_info("📡 Enviando solicitud a Gemini 3 Pro...", func_name)
+        # Llamar a Gemini (modelo barato configurable vía GEMINI_MODEL)
+        log_info(f"📡 Enviando solicitud a Gemini ({GEMINI_MODEL})...", func_name)
         
         response = gemini_client.models.generate_content(
-            model="gemini-3-pro-preview",  # Gemini 3 Pro (modelo más avanzado)
+            model=GEMINI_MODEL,
             contents=prompt,
             config={
                 "temperature": 0.3,
@@ -13241,7 +13243,7 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                         f.write(f"Fecha creación: {datetime.now().isoformat()}\n")
                         f.write(f"Archivo origen: {rel} ({tipo_archivo})\n")
                         f.write(f"Términos encontrados: {', '.join(terminos_nombres)}\n")
-                        f.write(f"Generado por: Video Analyzer IA v5.0\n")
+                        f.write(f"Generado por: Video Analyzer IA v5.1\n")
             
                 # ========== GUARDAR TRANSCRIPCIÓN COMPLETA DEL VIDEO ==========
                 transcripcion_completa_path = os.path.join(archivo_main_dir, "TRANSCRIPCION_COMPLETA.txt")
@@ -13272,7 +13274,7 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                             f.write(f"- Total de palabras: {len(transcripcion_mistral.split())}\n")
                             f.write(f"- Total de caracteres: {len(transcripcion_mistral)}\n")
                             f.write(f"\n{'='*80}\n")
-                            f.write(f"✅ Generado automáticamente por Video Analyzer IA v5.0\n")
+                            f.write(f"✅ Generado automáticamente por Video Analyzer IA v5.1\n")
                     
                         log_info(f"✅ Transcripción completa guardada: {transcripcion_completa_path}", func_name)
                         if not mostrar_solo_relevantes:

@@ -1,9 +1,9 @@
-# Grabaciones — Video Analyzer Pro v5.0
+# Grabaciones — Video Analyzer Pro v5.1
 
 Aplicación de **análisis de video con IA** (Streamlit): busca términos en grabaciones, genera clips, transcribe con Whisper / APIs y envía resultados a **Telegram**, **webhooks**, **correo (Brevo)**, **Google Drive**, **Cloudinary**, **Cloudflare R2** (opcional) y **Supabase**, con soporte **multi-cliente** (cada término puede ir a destinos distintos).
 
-**Versión actual:** **5.0** (`appMonitoreo.py`, tag Git `v5.0`).  
-**Versión anterior en GitHub:** **v4.0** (2026-07-27).
+**Versión actual:** **5.1** (`appMonitoreo.py`, tag Git `v5.1`).  
+**Versión anterior en GitHub:** **v5.0** (2026-07-31).
 
 ---
 
@@ -238,7 +238,12 @@ Uso interno / proyecto personal salvo que indiques otra licencia. Las marcas cit
 
 ## 📌 Cambios automáticos
 
-- [2026-07-31] FEAT: Video Analyzer v5.0
+- [2026-07-31] FEAT: Video Analyzer v5.1
+  - Gemini: reemplazo de `gemini-3-pro-preview` (apagado) por `gemini-2.5-flash-lite` (más barato; `GEMINI_MODEL` en `.env`).
+
+- [2026-07-31] FIX: Gemini — salir de `gemini-3-pro-preview` (apagado)
+  - Modelo por defecto: `gemini-2.5-flash-lite` (el más barato: ~$0.10/$0.40 por 1M; retira 2026-10-16).
+  - Configurable con `GEMINI_MODEL` en `.env` (p. ej. `gemini-3.1-flash-lite` para opción estable).
   - UI Versión 5 + banner de cadena IA; sidebar con horarios de escaneo activos.
   - Cadena: Kimi → GLM → Gemini/GPT-4o → DeepSeek (Kimi default).
   - Parrilla: bloques 12:00–15:00 y 21:00–24:00 en canales filtrados.

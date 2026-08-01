@@ -538,6 +538,19 @@ CLOUDINARY_CONFIG = os.path.join(CARPETA_PROCESADOS, "cloudinary_config.json")  
 BUNNY_CONFIG = os.path.join(CARPETA_PROCESADOS, "bunny_config.json")  # Configuración de Bunny.net Storage
 CACHE_ESCANEO = os.path.join(CARPETA_PROCESADOS, "cache_escaneo.json")  # Caché de archivos escaneados
 CLIENTES_CONFIG = str(_DIR_SCRIPT / "clientes_config.json")
+# v5.5 Intrant: un solo cliente. Evita reaparición de EDESUR/MINERD/Presidencia y correos ajenos.
+APP_VERSION = "5.5"
+MODO_SOLO_INTRANT = True
+CLIENTE_ID_UNICO = "intrant"
+TERMINOS_INTRANT_CANONICOS = (
+    "intrant",
+    "milton morrison",
+    "morrison",
+    "digest",
+    "erredevial",
+    "digeset",
+    "motoristas",
+)
 TAMANO_MINIMO_BYTES = 8 * 1024 * 1024  # 8 MB: umbral preferido antes de procesar
 TAMANO_CORRUPTO_BYTES = 100 * 1024  # <100 KB estable → incompleto/basura (no dejar en carpeta)
 GRACIA_ESCRITURA_VIDEO_SEG = 90  # segundos sin modificar = ya no está grabando
@@ -764,18 +777,31 @@ def cargar_clientes():
         if os.path.exists(CLIENTES_CONFIG):
             with open(CLIENTES_CONFIG, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                return data.get('clientes', [])
+                clientes = data.get('clientes', [])
+                if MODO_SOLO_INTRANT:
+                    return [
+                        c for c in clientes
+                        if (c.get('id') or '').strip().lower() == CLIENTE_ID_UNICO
+                    ]
+                return clientes
     except Exception as e:
         log_exception("cargar_clientes", e)
     return []
 
 def guardar_clientes(clientes):
-    """Guarda la lista de clientes"""
+    """Guarda la lista de clientes. En modo Intrant solo persiste el cliente Intrant."""
     try:
+        if MODO_SOLO_INTRANT:
+            clientes = [
+                c for c in (clientes or [])
+                if (c.get('id') or '').strip().lower() == CLIENTE_ID_UNICO
+            ]
         data = {
             'clientes': clientes,
             'fecha_actualizacion': datetime.now().isoformat(),
-            'total_clientes': len(clientes)
+            'total_clientes': len(clientes),
+            'modo': 'solo_intrant' if MODO_SOLO_INTRANT else 'multi',
+            'version': APP_VERSION,
         }
         with open(CLIENTES_CONFIG, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
@@ -785,81 +811,195 @@ def guardar_clientes(clientes):
         return False
 
 def obtener_cliente_por_id(cliente_id):
-    """Obtiene un cliente por su ID"""
+    """Obtiene un cliente por su ID. En modo solo Intrant, otros IDs no existen."""
+    cid = (cliente_id or '').strip().lower()
+    if MODO_SOLO_INTRANT and cid and cid != CLIENTE_ID_UNICO:
+        return None
     clientes = cargar_clientes()
     for cliente in clientes:
-        if cliente.get('id') == cliente_id:
+        if (cliente.get('id') or '').strip().lower() == cid:
             return cliente
     return None
 
-def obtener_cliente_default():
-    """Retorna la configuración por defecto (sistema EDESUR — legacy / plantilla)."""
+def _plantilla_cliente_intrant_vacia():
+    """Plantilla Intrant sin secretos (último recurso si falta en disco)."""
     return {
-        'id': 'default',
-        'nombre': 'Sistema Principal (EDESUR)',
+        'id': CLIENTE_ID_UNICO,
+        'nombre': 'Intrant',
         'activo': True,
-        'color': '#1E88E5',
-        'webhook': {
-            'enabled': True,
-            'url': 'https://hook.us1.make.com/1nk48toiy2c64f9966yue8bwhzqnosny',
-            'url_secundario': '',
-            'url_terciario': ''
-        },
+        'incluir_en_analisis': True,
+        'color': '#4CAF50',
+        'fecha_creacion': datetime.now().isoformat(),
+        'webhook': {'enabled': False, 'url': ''},
         'telegram': {
-            'enabled': True,
+            'enabled': False,
             'bot_token': '',
-            'chat_id': '',
+            'chat_id': '@AlertasIntrant',
             'send_clips': True,
             'send_summary': True,
-            'use_cloudinary': True
+            'use_cloudinary': True,
         },
         'brevo': {
-            'enabled': True,
+            'enabled': False,
             'api_key': '',
-            'sender_email': '',
-            'sender_name': 'Sistema de Análisis de Videos',
-            'correos_destinatarios': []
+            'smtp_user': '951480002@smtp-brevo.com',
+            'smtp_server': 'smtp-relay.brevo.com',
+            'smtp_port': 587,
+            'sender_email': 'info@fgjmedios.com',
+            'sender_name': 'FGJ Medios - Alertas Intrant',
+            'correos_destinatarios': [],
         },
-        'google_drive': {
-            'enabled': True,
-            'folder_id': GOOGLE_DRIVE_FOLDER_ID if 'GOOGLE_DRIVE_FOLDER_ID' in dir() else ''
-        },
+        'google_drive': {'enabled': False, 'folder_id': ''},
         'cloudinary': {
-            'enabled': True,
+            'enabled': False,
             'cloud_name': '',
             'api_key': '',
             'api_secret': '',
-            'folder': 'video_analyzer_clips'
-        },
-        'bunny': {
-            'enabled': False,
-            'storage_zone': '',
-            'access_key': '',
-            'folder': 'video_analyzer_clips',
-            'cdn_base_url': ''
-        },
-        'r2': {
-            'enabled': True,
             'folder': 'video_analyzer_clips',
         },
-        'supabase': {
-            'enabled': True,
-            'url': SUPABASE_URL if SUPABASE_URL else '',
-            'anon_key': SUPABASE_ANON_KEY if SUPABASE_ANON_KEY else ''
-        }
+        'r2': {'enabled': True, 'folder': 'video_analyzer_clips'},
+        'supabase': {'enabled': False, 'url': '', 'anon_key': ''},
+        'terminos': list(TERMINOS_INTRANT_CANONICOS),
     }
 
 
+def _purgar_terminos_solo_intrant():
+    """Deja en terminos_guardados.json únicamente términos Intrant."""
+    func_name = "_purgar_terminos_solo_intrant"
+    try:
+        if not os.path.exists(TERMINOS_CONFIG):
+            data = {'terminos': [], 'total_terminos': 0}
+        else:
+            with open(TERMINOS_CONFIG, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        terminos = data.get('terminos') or []
+        keep = []
+        seen = set()
+        for t in terminos:
+            if isinstance(t, dict):
+                nombre = (t.get('termino') or '').strip()
+                cid = (t.get('cliente_id') or '').strip().lower()
+                if cid == CLIENTE_ID_UNICO and nombre:
+                    key = nombre.lower()
+                    if key not in seen:
+                        seen.add(key)
+                        keep.append({'termino': nombre, 'cliente_id': CLIENTE_ID_UNICO})
+            elif isinstance(t, str) and t.strip().lower() in {x.lower() for x in TERMINOS_INTRANT_CANONICOS}:
+                key = t.strip().lower()
+                if key not in seen:
+                    seen.add(key)
+                    keep.append({'termino': t.strip(), 'cliente_id': CLIENTE_ID_UNICO})
+        if not keep:
+            keep = [{'termino': n, 'cliente_id': CLIENTE_ID_UNICO} for n in TERMINOS_INTRANT_CANONICOS]
+        if keep != terminos:
+            bak = str(_DIR_SCRIPT / f"terminos_guardados.bak_auto_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+            try:
+                with open(bak, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, indent=2, ensure_ascii=False)
+            except Exception:
+                pass
+            out = {
+                'terminos': keep,
+                'fecha_actualizacion': datetime.now().isoformat(),
+                'total_terminos': len(keep),
+                'modo': 'solo_intrant',
+                'version': APP_VERSION,
+            }
+            with open(TERMINOS_CONFIG, 'w', encoding='utf-8') as f:
+                json.dump(out, f, indent=2, ensure_ascii=False)
+            log_info(f"Términos purgados a solo Intrant ({len(keep)})", func_name)
+    except Exception as e:
+        log_exception(func_name, e)
+
+
+def asegurar_modo_solo_intrant():
+    """
+    v5.5: elimina del JSON cualquier cliente que no sea Intrant y alinea términos.
+    Evita que obtener_clientes_activos() vuelva a crear EDESUR.
+    """
+    if not MODO_SOLO_INTRANT:
+        return
+    func_name = "asegurar_modo_solo_intrant"
+    try:
+        raw = []
+        if os.path.exists(CLIENTES_CONFIG):
+            with open(CLIENTES_CONFIG, 'r', encoding='utf-8') as f:
+                raw = (json.load(f) or {}).get('clientes') or []
+        intrant = None
+        otros = []
+        for c in raw:
+            if (c.get('id') or '').strip().lower() == CLIENTE_ID_UNICO:
+                intrant = c
+            else:
+                otros.append(c.get('id') or c.get('nombre') or '?')
+        if otros:
+            bak = str(_DIR_SCRIPT / f"clientes_config.bak_purga_v{APP_VERSION}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+            try:
+                with open(bak, 'w', encoding='utf-8') as f:
+                    json.dump({'clientes': raw, 'purgados': otros}, f, indent=2, ensure_ascii=False)
+            except Exception:
+                pass
+            log_warning(f"Modo solo Intrant: eliminados clientes {otros} (backup {os.path.basename(bak)})", func_name)
+        if not intrant:
+            # Recuperar desde backup reciente si existe
+            for cand in sorted(_DIR_SCRIPT.glob('clientes_config.bak*.json'), reverse=True):
+                try:
+                    with open(cand, 'r', encoding='utf-8') as f:
+                        blob = json.load(f)
+                    for c in blob.get('clientes') or []:
+                        if (c.get('id') or '').strip().lower() == CLIENTE_ID_UNICO:
+                            intrant = c
+                            log_info(f"Intrant recuperado desde {cand.name}", func_name)
+                            break
+                    if intrant:
+                        break
+                except Exception:
+                    continue
+        if not intrant:
+            intrant = _plantilla_cliente_intrant_vacia()
+            log_warning("Intrant no estaba en disco; se creó plantilla (completa Brevo/Telegram en UI)", func_name)
+        intrant['id'] = CLIENTE_ID_UNICO
+        intrant['nombre'] = intrant.get('nombre') or 'Intrant'
+        intrant['activo'] = True
+        intrant['incluir_en_analisis'] = True
+        brevo = intrant.setdefault('brevo', {})
+        if not (brevo.get('smtp_user') or '').strip().lower().endswith('@smtp-brevo.com'):
+            brevo['smtp_user'] = '951480002@smtp-brevo.com'
+        brevo.setdefault('smtp_server', 'smtp-relay.brevo.com')
+        brevo.setdefault('smtp_port', 587)
+        # Persistir solo Intrant (aunque ya estuviera solo: alinea flags)
+        if len(raw) != 1 or otros or (raw and (raw[0].get('id') or '').lower() != CLIENTE_ID_UNICO):
+            guardar_clientes([intrant])
+        elif not raw[0].get('incluir_en_analisis', False) or not raw[0].get('activo', True):
+            guardar_clientes([intrant])
+        _purgar_terminos_solo_intrant()
+    except Exception as e:
+        log_exception(func_name, e)
+
+
+def obtener_cliente_default():
+    """Compat: ya no devuelve EDESUR. En v5.5+ es Intrant."""
+    c = None
+    try:
+        if os.path.exists(CLIENTES_CONFIG):
+            with open(CLIENTES_CONFIG, 'r', encoding='utf-8') as f:
+                for cliente in (json.load(f) or {}).get('clientes') or []:
+                    if (cliente.get('id') or '').strip().lower() == CLIENTE_ID_UNICO:
+                        c = cliente
+                        break
+    except Exception:
+        pass
+    return c or _plantilla_cliente_intrant_vacia()
+
+
 def obtener_cliente_en_analisis():
-    """
-    Cliente activo de monitoreo (incluir_en_analisis=True).
-    Hoy solo Intrant está en análisis: correos, Drive y fallbacks van a ese cliente,
-    no a Edesur.
-    """
+    """Cliente de monitoreo: siempre Intrant en v5.5."""
+    if MODO_SOLO_INTRANT:
+        return obtener_cliente_por_id(CLIENTE_ID_UNICO) or obtener_cliente_default()
     try:
         activos = [
             c for c in cargar_clientes()
-            if c.get('activo', True) and c.get('incluir_en_analisis', True)
+            if c.get('activo', True) and c.get('incluir_en_analisis', False)
         ]
     except Exception:
         activos = []
@@ -937,6 +1077,8 @@ def crear_cliente_nuevo(nombre, color='#4CAF50'):
 
 def agregar_cliente(cliente):
     """Agrega un nuevo cliente a la lista"""
+    if MODO_SOLO_INTRANT:
+        return False, "v5.5 Intrant: no se pueden agregar otros clientes"
     clientes = cargar_clientes()
     # Verificar que no exista un cliente con el mismo nombre
     for c in clientes:
@@ -949,11 +1091,16 @@ def agregar_cliente(cliente):
 
 def actualizar_cliente(cliente_id, datos_actualizados):
     """Actualiza un cliente existente"""
+    if MODO_SOLO_INTRANT and (cliente_id or '').strip().lower() != CLIENTE_ID_UNICO:
+        return False, "v5.5 Intrant: solo se puede editar Intrant"
     clientes = cargar_clientes()
     for i, cliente in enumerate(clientes):
         if cliente.get('id') == cliente_id:
             clientes[i].update(datos_actualizados)
             clientes[i]['fecha_actualizacion'] = datetime.now().isoformat()
+            if MODO_SOLO_INTRANT:
+                clientes[i]['incluir_en_analisis'] = True
+                clientes[i]['activo'] = True
             if guardar_clientes(clientes):
                 return True, "Cliente actualizado exitosamente"
             return False, "Error guardando cambios"
@@ -961,8 +1108,10 @@ def actualizar_cliente(cliente_id, datos_actualizados):
 
 def eliminar_cliente(cliente_id):
     """Elimina un cliente de la lista"""
-    if cliente_id == 'default':
-        return False, "No se puede eliminar el cliente por defecto"
+    if (cliente_id or '').strip().lower() == CLIENTE_ID_UNICO:
+        return False, "No se puede eliminar Intrant (cliente único v5.5)"
+    if MODO_SOLO_INTRANT:
+        return False, "v5.5 Intrant: no hay otros clientes que eliminar"
     clientes = cargar_clientes()
     clientes_filtrados = [c for c in clientes if c.get('id') != cliente_id]
     if len(clientes_filtrados) == len(clientes):
@@ -972,15 +1121,16 @@ def eliminar_cliente(cliente_id):
     return False, "Error eliminando cliente"
 
 def obtener_clientes_activos():
-    """Retorna lista de clientes activos incluyendo el default"""
+    """Retorna clientes activos. v5.5: solo Intrant (nunca recrea EDESUR)."""
+    if MODO_SOLO_INTRANT:
+        asegurar_modo_solo_intrant()
+        clientes = cargar_clientes()
+        if not clientes:
+            plantilla = _plantilla_cliente_intrant_vacia()
+            guardar_clientes([plantilla])
+            return [plantilla]
+        return [c for c in clientes if c.get('activo', True)]
     clientes = cargar_clientes()
-    # Agregar cliente default si no existe
-    tiene_default = any(c.get('id') == 'default' for c in clientes)
-    if not tiene_default:
-        # Migrar configuración actual al cliente default
-        cliente_default = migrar_config_actual_a_cliente()
-        clientes.insert(0, cliente_default)
-        guardar_clientes(clientes)
     return [c for c in clientes if c.get('activo', True)]
 
 def migrar_config_actual_a_cliente():
@@ -1111,6 +1261,13 @@ def obtener_cliente_por_termino(termino):
                             c = obtener_cliente_por_id(cliente_id)
                             if c:
                                 return c
+                            # Cliente borrado del JSON → Intrant en análisis, no Edesur
+                            log_warning(
+                                f"Término '{termino}' apunta a cliente '{cliente_id}' inexistente; "
+                                f"usando cliente en análisis",
+                                "obtener_cliente_por_termino",
+                            )
+                            return obtener_cliente_en_analisis()
                     elif isinstance(t, str):
                         if (t.strip().lower()) == term_norm:
                             return obtener_cliente_en_analisis()
@@ -1130,12 +1287,18 @@ def obtener_cliente_por_termino(termino):
     return obtener_cliente_en_analisis()
 
 def cliente_incluye_en_analisis(cliente_id):
-    """True si los términos de este cliente deben buscarse en el análisis (sidebar)."""
-    cliente = obtener_cliente_por_id(cliente_id) or obtener_cliente_default()
-    return cliente.get('incluir_en_analisis', True)
+    """True solo si el cliente existe y tiene incluir_en_analisis=True.
+
+    Si el cliente no está en clientes_config.json o falta el flag, NO se busca
+    (evita que términos de Edesur/MINERD pasen cuando solo Intrant está activo).
+    """
+    cliente = obtener_cliente_por_id(cliente_id)
+    if not cliente:
+        return False
+    return bool(cliente.get('incluir_en_analisis', False))
 
 def filtrar_terminos_por_analisis_clientes(terminos_list):
-    """Excluye términos cuyo cliente tiene incluir_en_analisis=False en clientes_config.json."""
+    """Excluye términos cuyo cliente no tiene incluir_en_analisis=True."""
     if not terminos_list:
         return []
     out = []
@@ -1311,6 +1474,24 @@ def enviar_telegram_cliente(cliente, mensaje, video_path=None, parse_mode='Markd
     
     return any(exitos) if exitos else False, " | ".join(mensajes)
 
+# Usuario SMTP de Brevo (login). Nunca usar el From (info@…) — provoca 535 Authentication failed.
+BREVO_SMTP_USER_DEFAULT = '951480002@smtp-brevo.com'
+
+
+def _brevo_smtp_login(brevo_config):
+    """Devuelve (smtp_user, smtp_server, smtp_port). Nunca usa el From como login SMTP."""
+    cfg = brevo_config or {}
+    smtp_user = (cfg.get('smtp_user') or '').strip()
+    if not smtp_user.lower().endswith('@smtp-brevo.com'):
+        smtp_user = BREVO_SMTP_USER_DEFAULT
+    smtp_server = (cfg.get('smtp_server') or 'smtp-relay.brevo.com').strip()
+    try:
+        smtp_port = int(cfg.get('smtp_port') or 587)
+    except (TypeError, ValueError):
+        smtp_port = 587
+    return smtp_user, smtp_server, smtp_port
+
+
 def enviar_brevo_cliente(cliente, termino_encontrado, resumen_completo, nombre_video, video_path=None, info_medio="", terminos_detectados=[], video_url=None, video_url_bunny=None, video_url_r2=None, transcripcion_segmento=""):
     """Envía correo usando Brevo SMTP con credenciales del cliente (igual que transmistral2.py)"""
     func_name = "enviar_brevo_cliente"
@@ -1324,10 +1505,7 @@ def enviar_brevo_cliente(cliente, termino_encontrado, resumen_completo, nombre_v
     sender_name = brevo_config.get('sender_name', f'Sistema {cliente.get("nombre", "")}')
     correos_destinatarios = brevo_config.get('correos_destinatarios', [])
     
-    # Configuración SMTP (igual que transmistral2.py)
-    smtp_user = brevo_config.get('smtp_user', sender_email)
-    smtp_server = brevo_config.get('smtp_server', 'smtp-relay.brevo.com')
-    smtp_port = brevo_config.get('smtp_port', 587)
+    smtp_user, smtp_server, smtp_port = _brevo_smtp_login(brevo_config)
     
     if not api_key or not sender_email:
         return False, "Configuración de Brevo incompleta"
@@ -2296,9 +2474,7 @@ def enviar_brevo_tangencial_inmediato(cliente, item_tangencial):
     sender_email = brevo_config.get('sender_email', '')
     sender_name = brevo_config.get('sender_name', f'Sistema {cliente.get("nombre", "")}')
     correos_destinatarios = brevo_config.get('correos_destinatarios', [])
-    smtp_user = brevo_config.get('smtp_user', sender_email)
-    smtp_server = brevo_config.get('smtp_server', 'smtp-relay.brevo.com')
-    smtp_port = brevo_config.get('smtp_port', 587)
+    smtp_user, smtp_server, smtp_port = _brevo_smtp_login(brevo_config)
 
     if not api_key or not sender_email:
         return False, "Configuración de Brevo incompleta"
@@ -2484,9 +2660,7 @@ def enviar_brevo_menciones_tangenciales_cliente(cliente, items_list, hora_ciclo=
     sender_email = brevo_config.get('sender_email', '')
     sender_name = brevo_config.get('sender_name', f'Sistema {cliente.get("nombre", "")}')
     correos_destinatarios = brevo_config.get('correos_destinatarios', [])
-    smtp_user = brevo_config.get('smtp_user', sender_email)
-    smtp_server = brevo_config.get('smtp_server', 'smtp-relay.brevo.com')
-    smtp_port = brevo_config.get('smtp_port', 587)
+    smtp_user, smtp_server, smtp_port = _brevo_smtp_login(brevo_config)
 
     if not api_key or not sender_email:
         return False, "Configuración de Brevo incompleta"
@@ -5015,7 +5189,7 @@ TRANSCRIPCIÓN COMPLETA:
 {transcripcion_completa}
 
 ===============================================
-GENERADO POR: Video Analyzer IA v5.3
+GENERADO POR: Video Analyzer IA v5.5
 ===============================================
 """
             
@@ -5756,7 +5930,7 @@ def generar_md_sesion_coincidencias(
         # ============================
         md.append(f"# 🎯 Reporte de Sesión - Coincidencias Detectadas")
         md.append(f"")
-        md.append(f"> **Video Analyzer IA v5.3** | Sesión: {fecha_legible}")
+        md.append(f"> **Video Analyzer IA v5.5** | Sesión: {fecha_legible}")
         md.append(f"")
         md.append(f"---")
         md.append(f"")
@@ -5941,7 +6115,7 @@ def generar_md_sesion_coincidencias(
         # ============================
         # PIE
         # ============================
-        md.append(f"_Reporte generado automáticamente por Video Analyzer IA v5.3 - {fecha_legible}_")
+        md.append(f"_Reporte generado automáticamente por Video Analyzer IA v5.5 - {fecha_legible}_")
         
         # === ESCRIBIR ARCHIVO ===
         contenido_final = "\n".join(md)
@@ -6786,7 +6960,7 @@ def generar_html_resumen_diario(coincidencias, cliente_nombre, corte_label, fech
         <!-- Footer -->
         <div style="background: #343a40; color: white; padding: 20px; border-radius: 0 0 16px 16px; text-align: center;">
             <p style="margin: 4px 0; opacity: 0.8; font-size: 13px;">
-                🤖 Resumen generado automáticamente por Video Analyzer IA v5.3
+                🤖 Resumen generado automáticamente por Video Analyzer IA v5.5
             </p>
             <p style="margin: 4px 0; opacity: 0.6; font-size: 12px;">
                 {datetime.now().strftime('%d/%m/%Y %H:%M:%S')} &middot; {cliente_nombre}
@@ -6880,9 +7054,7 @@ def enviar_resumen_diario_clientes(corte="mañana"):
             api_key = brevo_config.get('api_key', '')
             sender_email = brevo_config.get('sender_email', '')
             sender_name = brevo_config.get('sender_name', f'Sistema {cliente_nombre}')
-            smtp_user = brevo_config.get('smtp_user', sender_email)
-            smtp_server = brevo_config.get('smtp_server', 'smtp-relay.brevo.com')
-            smtp_port = brevo_config.get('smtp_port', 587)
+            smtp_user, smtp_server, smtp_port = _brevo_smtp_login(brevo_config)
             
             msg = MIMEMultipart('alternative')
             msg['Subject'] = f"📊 Resumen {corte_label} - {cliente_nombre} ({len(coincs_cliente)} coincidencias)"
@@ -7550,7 +7722,7 @@ def enviar_clips_a_telegram(clips_generados, resumen, terminos_detectados, video
 📋 *RESUMEN EJECUTIVO:*
 {resumen}
 
-🌐 *Servidor:* Analizador de Videos IA v5.3
+🌐 *Servidor:* Analizador de Videos IA v5.5
 
 ⬇️ *Videos a continuación...*"""
         
@@ -7667,7 +7839,7 @@ def test_telegram_connection():
 
 ✅ Bot conectado correctamente
 ⏰ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-🤖 Analizador de Videos IA v5.3
+🤖 Analizador de Videos IA v5.5
 
 Este es un mensaje de prueba."""
     
@@ -7779,6 +7951,15 @@ def init_session_state():
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
+
+# v5.5: purgar EDESUR/MINERD/Presidencia antes de la UI
+try:
+    asegurar_modo_solo_intrant()
+except Exception as _e_solo:
+    try:
+        log_warning(f"asegurar_modo_solo_intrant al inicio: {_e_solo}", "STARTUP")
+    except Exception:
+        pass
 
 # Inicializar estado después de definir la función
 init_session_state()
@@ -8033,13 +8214,13 @@ with col5:
     else:
         st.warning("📧 **Brevo** ⚠️\nNo configurado")
     
-st.title("🎬 Análisis Automático de Videos - Versión 5.3 ✅")
+st.title("🎬 Análisis Automático de Videos — v5.5 Intrant ✅")
 st.info(
-    f"🧠 **v5.3** | Cadena: Kimi → GLM → Gemini/GPT-4o → DeepSeek. "
-    f"Preferido: **{obtener_etiqueta_motor_sesion()}**. "
+    f"🧠 **v5.5 Intrant** | Solo cliente **Intrant** (sin EDESUR/MINERD/Presidencia). "
+    f"Cadena: Kimi → GLM → Gemini/GPT-4o → DeepSeek. Preferido: **{obtener_etiqueta_motor_sesion()}**. "
     "Lun–vie: horarios de escaneo (sidebar). **06:00–09:00**, **21:00–24:00** y sáb/dom y CDN/TRA: todos."
 )
-st.markdown(f"📁 Carpeta: `{CARPETA_VIDEOS}` | 🌐 Webhook: Make.com | 📱 Telegram: @edesuralertas | ☁️ Google Drive: Activo | 📧 Brevo: Correos")
+st.markdown(f"📁 Carpeta: `{CARPETA_VIDEOS}` | 📱 Telegram: @AlertasIntrant | ☁️ Google Drive | 📧 Brevo Intrant")
 st.info("⏱️ **Configuración de clips:** Por defecto genera clips de 1 minuto (30s antes + 30s después de cada coincidencia)")
 
 # === BOTÓN DE PRUEBA GLOBAL DE TODOS LOS CLIENTES ===
@@ -8079,9 +8260,7 @@ def probar_conexiones_cliente(cliente):
     brevo_config = cliente.get('brevo', {})
     if brevo_config.get('enabled') and brevo_config.get('api_key'):
         try:
-            smtp_server = brevo_config.get('smtp_server', 'smtp-relay.brevo.com')
-            smtp_port = brevo_config.get('smtp_port', 587)
-            smtp_user = brevo_config.get('smtp_user', brevo_config.get('sender_email', ''))
+            smtp_user, smtp_server, smtp_port = _brevo_smtp_login(brevo_config)
             api_key = brevo_config['api_key']
             
             # Probar conexión SMTP (igual que verificar_conexiones.py)
@@ -8579,11 +8758,11 @@ with st.sidebar:
         _scid = _sc.get('id', '')
         _skey = f"sidebar_incluir_analisis_{_scid}"
         if _skey not in st.session_state:
-            st.session_state[_skey] = bool(_sc.get('incluir_en_analisis', True))
+            st.session_state[_skey] = bool(_sc.get('incluir_en_analisis', False))
 
         def _mk_save_analisis(client_id, state_key):
             def _save():
-                val = bool(st.session_state.get(state_key, True))
+                val = bool(st.session_state.get(state_key, False))
                 actualizar_cliente(client_id, {'incluir_en_analisis': val})
             return _save
 
@@ -13487,7 +13666,7 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                         f.write(f"Fecha creación: {datetime.now().isoformat()}\n")
                         f.write(f"Archivo origen: {rel} ({tipo_archivo})\n")
                         f.write(f"Términos buscados: {', '.join(terminos_nombres)}\n")
-                        f.write(f"Generado por: Video Analyzer IA v5.3\n")
+                        f.write(f"Generado por: Video Analyzer IA v5.5\n")
             
                 # ========== GUARDAR TRANSCRIPCIÓN COMPLETA DEL VIDEO ==========
                 transcripcion_completa_path = os.path.join(archivo_main_dir, "TRANSCRIPCION_COMPLETA.txt")
@@ -13518,7 +13697,7 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                             f.write(f"- Total de palabras: {len(transcripcion_mistral.split())}\n")
                             f.write(f"- Total de caracteres: {len(transcripcion_mistral)}\n")
                             f.write(f"\n{'='*80}\n")
-                            f.write(f"✅ Generado automáticamente por Video Analyzer IA v5.3\n")
+                            f.write(f"✅ Generado automáticamente por Video Analyzer IA v5.5\n")
                     
                         log_info(f"✅ Transcripción completa guardada: {transcripcion_completa_path}", func_name)
                         if not mostrar_solo_relevantes:
@@ -15415,13 +15594,15 @@ with tab4:
     with col_header1:
         st.markdown("### 🏢 Entidades y Rutas de Envío")
     with col_header2:
-        if st.button("➕ Nueva Entidad", type="primary", key="btn_abrir_nueva"):
+        if MODO_SOLO_INTRANT:
+            st.caption("v5.5: solo Intrant")
+        elif st.button("➕ Nueva Entidad", type="primary", key="btn_abrir_nueva"):
             st.session_state['mostrar_form_nueva'] = not st.session_state.get('mostrar_form_nueva', False)
     
     # ================================================================
     # FORMULARIO NUEVA ENTIDAD (toggle)
     # ================================================================
-    if st.session_state.get('mostrar_form_nueva', False):
+    if (not MODO_SOLO_INTRANT) and st.session_state.get('mostrar_form_nueva', False):
         st.markdown("---")
         st.markdown("#### 🆕 Crear Nueva Entidad")
         c1, c2, c3 = st.columns([3, 1, 1])

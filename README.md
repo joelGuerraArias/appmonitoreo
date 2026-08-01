@@ -1,9 +1,9 @@
-# Grabaciones — Video Analyzer Pro v5.3
+# Grabaciones — Video Analyzer Pro v5.5 Intrant
 
-Aplicación de **análisis de video con IA** (Streamlit): busca términos en grabaciones, genera clips, transcribe con Whisper / APIs y envía resultados a **Telegram**, **webhooks**, **correo (Brevo)**, **Google Drive**, **Cloudinary**, **Cloudflare R2** (opcional) y **Supabase**, con soporte **multi-cliente** (cada término puede ir a destinos distintos).
+Aplicación de **análisis de video con IA** (Streamlit): busca términos en grabaciones, genera clips, transcribe con Whisper / APIs y envía resultados a **Telegram**, **correo (Brevo)**, **Google Drive**, **Cloudinary**, **Cloudflare R2** (opcional) y **Supabase**.
 
-**Versión actual:** **5.3** (`appMonitoreo.py`, tag Git `v5.3`).  
-**Versión anterior en GitHub:** **v5.2** (2026-07-31).
+**Versión actual:** **5.5 Intrant** (`appMonitoreo.py`, tag Git `v5.5`) — **solo cliente Intrant** (sin EDESUR / MINERD / Presidencia).  
+**Versión anterior en GitHub:** **v5.3** (2026-07-31).
 
 ---
 
@@ -237,6 +237,20 @@ Uso interno / proyecto personal salvo que indiques otra licencia. Las marcas cit
 ---
 
 ## 📌 Cambios automáticos
+
+- [2026-08-01] FEAT: Video Analyzer v5.5 Intrant
+  - Eliminados clientes y términos que no son Intrant; correos solo a destinatarios Intrant.
+  - `MODO_SOLO_INTRANT`: ya no se recrea EDESUR; al arrancar se purgan otros clientes del JSON.
+  - Tag Git `v5.5`.
+
+- [2026-08-01] FIX: correos Intrant no salían (Brevo 535)
+  - Tras el vaciado de config, coincidencias Intrant iban a EDESUR y SMTP usaba `info@…` en vez del login `@smtp-brevo.com`.
+  - Restaurado `smtp_user`; helper `_brevo_smtp_login` evita ese fallback incorrecto.
+
+- [2026-08-01] FIX: solo Intrant en análisis (apagones/educación)
+  - `clientes_config.json` se había quedado solo con EDESUR; términos de apagones y educación pasaban el filtro.
+  - Restaurado Intrant/MINERD/Presidencia; solo Intrant con `incluir_en_analisis: true`.
+  - Si falta el cliente o el flag, ya no se busca por defecto.
 
 - [2026-07-31] FEAT: Video Analyzer v5.3
   - Ventana 21:00–24:00 procesa todos los videos (como 06:00–09:00).

@@ -1,9 +1,9 @@
-# Grabaciones — Video Analyzer Pro v5.2
+# Grabaciones — Video Analyzer Pro v5.3
 
 Aplicación de **análisis de video con IA** (Streamlit): busca términos en grabaciones, genera clips, transcribe con Whisper / APIs y envía resultados a **Telegram**, **webhooks**, **correo (Brevo)**, **Google Drive**, **Cloudinary**, **Cloudflare R2** (opcional) y **Supabase**, con soporte **multi-cliente** (cada término puede ir a destinos distintos).
 
-**Versión actual:** **5.2** (`appMonitoreo.py`, tag Git `v5.2`).  
-**Versión anterior en GitHub:** **v5.1** (2026-07-31).
+**Versión actual:** **5.3** (`appMonitoreo.py`, tag Git `v5.3`).  
+**Versión anterior en GitHub:** **v5.2** (2026-07-31).
 
 ---
 
@@ -237,6 +237,14 @@ Uso interno / proyecto personal salvo que indiques otra licencia. Las marcas cit
 ---
 
 ## 📌 Cambios automáticos
+
+- [2026-07-31] FEAT: Video Analyzer v5.3
+  - Ventana 21:00–24:00 procesa todos los videos (como 06:00–09:00).
+  - Tangenciales: texto de motivo coherente; quitados términos genéricos cascos/accidentes.
+  - Restauración tras vaciado accidental de appMonitoreo.py.
+
+- [2026-07-31] MOD: ventana 21:00–24:00 procesa todos los videos
+  - Igual que 06:00–09:00: si el reloj del PC está en ese rango, sin filtro de parrilla.
 
 - [2026-07-31] FEAT: Video Analyzer v5.2
   - Búsqueda de términos solo en transcripción; Intrant activo (cascos, motoristas, accidentes de tránsito).

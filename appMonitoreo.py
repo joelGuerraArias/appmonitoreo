@@ -1565,6 +1565,78 @@ def _tangencial_motivo_una_frase(texto):
     return texto
 
 
+PROMPT_EXPLICACION_TANGENCIAL = (
+    "Eres analista de monitoreo de medios. El sistema YA clasificó cada ítem como "
+    "TANGENCIAL (descartado: no genera alerta con clip).\n"
+    "Recibirás JSON con: idx, termino, motivo_sistema, transcripcion.\n"
+    "Para cada ítem redacta UNA SOLA FRASE en español (tono profesional) que explique "
+    "POR QUÉ se descartó / por qué es tangencial.\n"
+    "REGLAS OBLIGATORIAS:\n"
+    "1) Habla solo del descarte: mención de pasada, sin desarrollo del tema, relevancia baja "
+    "o contexto que no justifica alerta.\n"
+    "2) PROHIBIDO decir que el clip 'parece relevante', que 'debería alertarse' o que es "
+    "'conceptualmente equivalente' al término buscado.\n"
+    "3) PROHIBIDO contradecirte (p. ej. 'no está el término literal pero el clip es relevante').\n"
+    "4) Si el audio habla de algo cercano pero no del término con peso suficiente, dilo así: "
+    "se descartó porque no desarrolla el tema del término «…».\n"
+    "5) No inventes hechos fuera de transcripcion+motivo_sistema.\n"
+    "6) Una sola oración por ítem (sin listas ni párrafos).\n"
+)
+
+
+def _explicacion_tangencial_es_ilogica(texto: str) -> bool:
+    """Detecta frases de enriquecimiento contradictorias o que niegan el descarte."""
+    t = (texto or "").lower()
+    if not t:
+        return True
+    malos = (
+        "parece relevante",
+        "clip parece relevante",
+        "conceptualmente equivalente",
+        "aunque el matching",
+        "matching exacto del término falle",
+        "matching exacto del termino falle",
+        "por tanto, el clip",
+        "por lo tanto, el clip",
+        "debería ser coincidencia",
+        "es relevante aunque",
+        "sigue siendo relevante",
+        "merece alerta",
+    )
+    if any(m in t for m in malos):
+        return True
+    niega = any(
+        x in t
+        for x in (
+            "no contiene literalmente",
+            "no aparece literal",
+            "matching exacto",
+            "no está el término",
+            "no esta el termino",
+        )
+    )
+    justifica = any(x in t for x in ("equivalente", "relevante", "igual de válido", "igual de valido"))
+    return niega and justifica
+
+
+def _aplicar_explicacion_tangencial(it, expl) -> bool:
+    """Aplica frase enriquecida si es lógica; si no, conserva el motivo técnico."""
+    if not isinstance(it, dict):
+        return False
+    expl = _tangencial_motivo_una_frase(expl)
+    if not expl or _explicacion_tangencial_es_ilogica(expl):
+        log_info(
+            f"⏭️ Explicación tangencial descartada (ilógica) para «{it.get('termino')}»; "
+            f"se mantiene motivo técnico",
+            "aplicar_explicacion_tangencial",
+        )
+        return False
+    prev = (it.get("motivo") or "").strip()
+    it["motivo_sistema"] = prev or it.get("motivo_sistema") or "Mención tangencial"
+    it["motivo"] = expl
+    return True
+
+
 def enriquecer_motivos_tangenciales_deepseek(items_list, func_name="enriquecer_motivos_tangenciales_deepseek"):
     """
     Sustituye `motivo` por una sola frase redactada vía DeepSeek a partir de la transcripción
@@ -1599,19 +1671,13 @@ def enriquecer_motivos_tangenciales_deepseek(items_list, func_name="enriquecer_m
 
     MAX_CH = 7000
     system_batch = (
-        "Eres analista de monitoreo de medios. Recibirás un JSON con ítems: idx, termino, motivo_sistema, transcripcion.\n"
-        '"motivo_sistema" es el motivo técnico que ya dio el clasificador; "transcripcion" es lo que se dijo en el medio (~audio).\n'
-        "Para cada ítem, redacta UNA SOLA FRASE en español, tono profesional para el cliente:\n"
-        "integrando transcripcion y motivo_sistema — qué ocurre en el contenido Y por qué el sistema lo marcó así.\n"
-        "Prioriza parafrasear la transcripción; no inventes hechos que no puedan inferirse de transcripcion+motivo_sistema.\n"
-        "Si transcripcion está vacía o muy breve, resume motivo_sistema sin inventar diálogo.\n"
-        "Una sola oración por ítem (sin punto aparte ni listas).\n"
-        'Responde SOLO con un JSON array: [{"idx": número, "explicacion": "texto"}, ...], un objeto por ítem; idx es el número recibido en cada ítem.'
+        PROMPT_EXPLICACION_TANGENCIAL
+        + 'Responde SOLO con un JSON array: [{"idx": número, "explicacion": "texto"}, ...], '
+        "un objeto por ítem; idx es el número recibido en cada ítem."
     )
     system_one = (
-        "Mismo rol. Responde SOLO JSON: {\"explicacion\": \"...\"} "
-        "(una sola frase en español que una transcripcion + motivo_sistema técnico; sin inventar; "
-        "si no hay transcripcion, aclara motivo_sistema sin inventar diálogo)."
+        PROMPT_EXPLICACION_TANGENCIAL
+        + 'Responde SOLO JSON: {"explicacion": "..."} (una sola frase).'
     )
 
     prepared = []
@@ -1662,10 +1728,7 @@ def enriquecer_motivos_tangenciales_deepseek(items_list, func_name="enriquecer_m
             it = items_list[orig_idx]
             if not isinstance(it, dict):
                 continue
-            expl = _tangencial_motivo_una_frase(by_idx.get(loc_idx, ""))
-            if expl:
-                it["motivo_sistema"] = it.get("motivo", "")
-                it["motivo"] = expl
+            if _aplicar_explicacion_tangencial(it, by_idx.get(loc_idx, "")):
                 n_ok += 1
         log_info(f"DeepSeek tangenciales: enriquecidos {n_ok}/{len(pend_orig_idx)} pendientes de {len(items_list)} (lote)", func_name)
     except Exception as e_batch:
@@ -1687,10 +1750,7 @@ def enriquecer_motivos_tangenciales_deepseek(items_list, func_name="enriquecer_m
                 )
                 raw = _parse_json_content(resp.choices[0].message.content)
                 obj = json.loads(raw)
-                expl = _tangencial_motivo_una_frase(obj.get("explicacion") or "")
-                if expl:
-                    it["motivo_sistema"] = it.get("motivo", "")
-                    it["motivo"] = expl
+                if _aplicar_explicacion_tangencial(it, obj.get("explicacion") or ""):
                     n_ok += 1
             except Exception as e_one:
                 log_warning(f"DeepSeek tangencial ítem orig_idx={orig_idx} sin enriquecer: {e_one}", func_name)
@@ -2032,8 +2092,8 @@ def _enriquecer_tangenciales_ollama_modelo(items_list, model_tag, func_name):
             "transcripcion": ev,
         })
     system = (
-        'Eres analista de medios. Responde SOLO JSON array '
-        '[{"idx":N,"explicacion":"una frase en español"},...].'
+        PROMPT_EXPLICACION_TANGENCIAL
+        + 'Responde SOLO JSON array [{"idx":N,"explicacion":"una frase en español"},...].'
     )
     raw = _ollama_chat(model_tag, system, json.dumps(prepared, ensure_ascii=False), temperature=0.3, max_tokens=1200)
     arr = json.loads(_limpiar_json_respuesta_modelo(raw))
@@ -2047,10 +2107,7 @@ def _enriquecer_tangenciales_ollama_modelo(items_list, model_tag, func_name):
     n_ok = 0
     for loc, orig in enumerate(pend):
         it = items_list[orig]
-        expl = _tangencial_motivo_una_frase(by_idx.get(loc, ""))
-        if expl:
-            it["motivo_sistema"] = it.get("motivo", "")
-            it["motivo"] = expl
+        if _aplicar_explicacion_tangencial(it, by_idx.get(loc, "")):
             n_ok += 1
     log_info(f"Ollama ({model_tag}) tangenciales: enriquecidos {n_ok}/{len(pend)}", func_name)
     if n_ok == 0:
@@ -4958,7 +5015,7 @@ TRANSCRIPCIÓN COMPLETA:
 {transcripcion_completa}
 
 ===============================================
-GENERADO POR: Video Analyzer IA v5.2
+GENERADO POR: Video Analyzer IA v5.3
 ===============================================
 """
             
@@ -5699,7 +5756,7 @@ def generar_md_sesion_coincidencias(
         # ============================
         md.append(f"# 🎯 Reporte de Sesión - Coincidencias Detectadas")
         md.append(f"")
-        md.append(f"> **Video Analyzer IA v5.2** | Sesión: {fecha_legible}")
+        md.append(f"> **Video Analyzer IA v5.3** | Sesión: {fecha_legible}")
         md.append(f"")
         md.append(f"---")
         md.append(f"")
@@ -5884,7 +5941,7 @@ def generar_md_sesion_coincidencias(
         # ============================
         # PIE
         # ============================
-        md.append(f"_Reporte generado automáticamente por Video Analyzer IA v5.2 - {fecha_legible}_")
+        md.append(f"_Reporte generado automáticamente por Video Analyzer IA v5.3 - {fecha_legible}_")
         
         # === ESCRIBIR ARCHIVO ===
         contenido_final = "\n".join(md)
@@ -6729,7 +6786,7 @@ def generar_html_resumen_diario(coincidencias, cliente_nombre, corte_label, fech
         <!-- Footer -->
         <div style="background: #343a40; color: white; padding: 20px; border-radius: 0 0 16px 16px; text-align: center;">
             <p style="margin: 4px 0; opacity: 0.8; font-size: 13px;">
-                🤖 Resumen generado automáticamente por Video Analyzer IA v5.2
+                🤖 Resumen generado automáticamente por Video Analyzer IA v5.3
             </p>
             <p style="margin: 4px 0; opacity: 0.6; font-size: 12px;">
                 {datetime.now().strftime('%d/%m/%Y %H:%M:%S')} &middot; {cliente_nombre}
@@ -7493,7 +7550,7 @@ def enviar_clips_a_telegram(clips_generados, resumen, terminos_detectados, video
 📋 *RESUMEN EJECUTIVO:*
 {resumen}
 
-🌐 *Servidor:* Analizador de Videos IA v5.2
+🌐 *Servidor:* Analizador de Videos IA v5.3
 
 ⬇️ *Videos a continuación...*"""
         
@@ -7610,7 +7667,7 @@ def test_telegram_connection():
 
 ✅ Bot conectado correctamente
 ⏰ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-🤖 Analizador de Videos IA v5.2
+🤖 Analizador de Videos IA v5.3
 
 Este es un mensaje de prueba."""
     
@@ -7976,11 +8033,11 @@ with col5:
     else:
         st.warning("📧 **Brevo** ⚠️\nNo configurado")
     
-st.title("🎬 Análisis Automático de Videos - Versión 5.2 ✅")
+st.title("🎬 Análisis Automático de Videos - Versión 5.3 ✅")
 st.info(
-    f"🧠 **v5.2** | Cadena: Kimi → GLM → Gemini/GPT-4o → DeepSeek. "
+    f"🧠 **v5.3** | Cadena: Kimi → GLM → Gemini/GPT-4o → DeepSeek. "
     f"Preferido: **{obtener_etiqueta_motor_sesion()}**. "
-    "Lun–vie: horarios de escaneo (sidebar). **06:00–09:00** y sáb/dom y CDN/TRA: todos."
+    "Lun–vie: horarios de escaneo (sidebar). **06:00–09:00**, **21:00–24:00** y sáb/dom y CDN/TRA: todos."
 )
 st.markdown(f"📁 Carpeta: `{CARPETA_VIDEOS}` | 🌐 Webhook: Make.com | 📱 Telegram: @edesuralertas | ☁️ Google Drive: Activo | 📧 Brevo: Correos")
 st.info("⏱️ **Configuración de clips:** Por defecto genera clips de 1 minuto (30s antes + 30s después de cada coincidencia)")
@@ -8542,7 +8599,7 @@ with st.sidebar:
     st.header("⏰ Horarios de escaneo (lun–vie)")
     st.caption(
         "Fin de semana: **todos**. "
-        "**06:00–09:00** (reloj PC): **todos**. "
+        "**06:00–09:00** y **21:00–24:00** (reloj PC): **todos**. "
         "Canales sin filtro (CDN, TRA…): **todos**."
     )
     try:
@@ -11863,6 +11920,7 @@ def video_pasa_filtro_escaneo_horario(nombre_o_ruta):
     Reglas:
     - Fin de semana (sáb/dom) → todos los videos, todos los canales.
     - Reloj local 06:00–09:00 → todos los videos (ventana matutina sin filtro).
+    - Reloj local 21:00–24:00 → todos los videos (ventana nocturna sin filtro).
     - Canal SIN escaneo_solo_horarios en programacion_tv.json → todos los videos, todo el día.
     - Canal CON escaneo_solo_horarios → solo los bloques definidos (lun–vie).
     """
@@ -11873,6 +11931,9 @@ def video_pasa_filtro_escaneo_horario(nombre_o_ruta):
     t_now = ahora.time()
     if datetime.strptime("06:00", "%H:%M").time() <= t_now < datetime.strptime("09:00", "%H:%M").time():
         return True, "ventana 06:00–09:00 — sin filtro de horario (todos los videos)"
+    # 21:00–24:00 (hora del PC): procesar todos, sin filtro de parrilla
+    if datetime.strptime("21:00", "%H:%M").time() <= t_now:
+        return True, "ventana 21:00–24:00 — sin filtro de horario (todos los videos)"
     meta = metadata_emision_archivo(nombre_o_ruta)
     canal = meta.get("canal") or ""
     slots = obtener_horarios_escaneo_canal(canal)
@@ -13426,7 +13487,7 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                         f.write(f"Fecha creación: {datetime.now().isoformat()}\n")
                         f.write(f"Archivo origen: {rel} ({tipo_archivo})\n")
                         f.write(f"Términos buscados: {', '.join(terminos_nombres)}\n")
-                        f.write(f"Generado por: Video Analyzer IA v5.2\n")
+                        f.write(f"Generado por: Video Analyzer IA v5.3\n")
             
                 # ========== GUARDAR TRANSCRIPCIÓN COMPLETA DEL VIDEO ==========
                 transcripcion_completa_path = os.path.join(archivo_main_dir, "TRANSCRIPCION_COMPLETA.txt")
@@ -13457,7 +13518,7 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                             f.write(f"- Total de palabras: {len(transcripcion_mistral.split())}\n")
                             f.write(f"- Total de caracteres: {len(transcripcion_mistral)}\n")
                             f.write(f"\n{'='*80}\n")
-                            f.write(f"✅ Generado automáticamente por Video Analyzer IA v5.2\n")
+                            f.write(f"✅ Generado automáticamente por Video Analyzer IA v5.3\n")
                     
                         log_info(f"✅ Transcripción completa guardada: {transcripcion_completa_path}", func_name)
                         if not mostrar_solo_relevantes:
@@ -13477,17 +13538,7 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                     'intrant': ['intran', 'in tran', 'in trant', 'intrans', 'el intrant', 'el intran'],
                     'morrison': ['morison', 'morisón', 'morrisón'],
                     'milton morrison': ['milton morison', 'milton morisón', 'milton morrisón'],
-                    'cascos': ['casco'],
                     'motoristas': ['motorista'],
-                    'accidentes de transito': [
-                        'accidente de transito',
-                        'accidentes de tránsito',
-                        'accidente de tránsito',
-                        'accidentes de trafico',
-                        'accidente de trafico',
-                        'accidentes de tráfico',
-                        'accidente de tráfico',
-                    ],
                     'edesur': ['ede sur', 'ede-sur'],
                     'edenorte': ['ede norte', 'ede-norte'],
                     'edeeste': ['ede este', 'ede-este'],

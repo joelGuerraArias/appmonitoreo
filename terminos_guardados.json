@@ -89,15 +89,7 @@
       "cliente_id": "intrant"
     },
     {
-      "termino": "cascos",
-      "cliente_id": "intrant"
-    },
-    {
       "termino": "motoristas",
-      "cliente_id": "intrant"
-    },
-    {
-      "termino": "accidentes de transito",
       "cliente_id": "intrant"
     },
     {
@@ -137,6 +129,6 @@
   "duracion_clip": 90,
   "buffer_anterior": 0,
   "mostrar_coincidencias": true,
-  "fecha_actualizacion": "2026-07-31T10:04:00.000000",
-  "total_terminos": 33
+  "fecha_actualizacion": "2026-07-31T22:49:43",
+  "total_terminos": 31
 }

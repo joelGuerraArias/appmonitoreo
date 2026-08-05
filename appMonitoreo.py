@@ -538,8 +538,8 @@ CLOUDINARY_CONFIG = os.path.join(CARPETA_PROCESADOS, "cloudinary_config.json")  
 BUNNY_CONFIG = os.path.join(CARPETA_PROCESADOS, "bunny_config.json")  # Configuración de Bunny.net Storage
 CACHE_ESCANEO = os.path.join(CARPETA_PROCESADOS, "cache_escaneo.json")  # Caché de archivos escaneados
 CLIENTES_CONFIG = str(_DIR_SCRIPT / "clientes_config.json")
-# v5.6 Intrant: un solo cliente. Evita reaparición de EDESUR/MINERD/Presidencia y correos ajenos.
-APP_VERSION = "5.6"
+# v5.7 Intrant: un solo cliente. Evita reaparición de EDESUR/MINERD/Presidencia y correos ajenos.
+APP_VERSION = "5.7"
 MODO_SOLO_INTRANT = True
 CLIENTE_ID_UNICO = "intrant"
 TERMINOS_INTRANT_CANONICOS = (
@@ -1543,7 +1543,7 @@ def _enviar_correo_autosemana_aviso(asunto, cuerpo_texto, cliente=None):
 
 
 def obtener_cliente_default():
-    """Compat: ya no devuelve EDESUR. En v5.6+ es Intrant."""
+    """Compat: ya no devuelve EDESUR. En v5.7+ es Intrant."""
     c = None
     try:
         if os.path.exists(CLIENTES_CONFIG):
@@ -1558,7 +1558,7 @@ def obtener_cliente_default():
 
 
 def obtener_cliente_en_analisis():
-    """Cliente de monitoreo: siempre Intrant en v5.6. Canales con credenciales quedan activos."""
+    """Cliente de monitoreo: siempre Intrant en v5.7. Canales con credenciales quedan activos."""
     if MODO_SOLO_INTRANT:
         c = obtener_cliente_por_id(CLIENTE_ID_UNICO) or obtener_cliente_default()
         if c:
@@ -1651,7 +1651,7 @@ def crear_cliente_nuevo(nombre, color='#4CAF50'):
 def agregar_cliente(cliente):
     """Agrega un nuevo cliente a la lista"""
     if MODO_SOLO_INTRANT:
-        return False, "v5.6 Intrant: no se pueden agregar otros clientes"
+        return False, "v5.7 Intrant: no se pueden agregar otros clientes"
     clientes = cargar_clientes()
     # Verificar que no exista un cliente con el mismo nombre
     for c in clientes:
@@ -1665,7 +1665,7 @@ def agregar_cliente(cliente):
 def actualizar_cliente(cliente_id, datos_actualizados):
     """Actualiza un cliente existente"""
     if MODO_SOLO_INTRANT and (cliente_id or '').strip().lower() != CLIENTE_ID_UNICO:
-        return False, "v5.6 Intrant: solo se puede editar Intrant"
+        return False, "v5.7 Intrant: solo se puede editar Intrant"
     clientes = cargar_clientes()
     for i, cliente in enumerate(clientes):
         if cliente.get('id') == cliente_id:
@@ -1682,9 +1682,9 @@ def actualizar_cliente(cliente_id, datos_actualizados):
 def eliminar_cliente(cliente_id):
     """Elimina un cliente de la lista"""
     if (cliente_id or '').strip().lower() == CLIENTE_ID_UNICO:
-        return False, "No se puede eliminar Intrant (cliente único v5.6)"
+        return False, "No se puede eliminar Intrant (cliente único v5.7)"
     if MODO_SOLO_INTRANT:
-        return False, "v5.6 Intrant: no hay otros clientes que eliminar"
+        return False, "v5.7 Intrant: no hay otros clientes que eliminar"
     clientes = cargar_clientes()
     clientes_filtrados = [c for c in clientes if c.get('id') != cliente_id]
     if len(clientes_filtrados) == len(clientes):
@@ -1694,7 +1694,7 @@ def eliminar_cliente(cliente_id):
     return False, "Error eliminando cliente"
 
 def obtener_clientes_activos():
-    """Retorna clientes activos. v5.6: solo Intrant (nunca recrea EDESUR)."""
+    """Retorna clientes activos. v5.7: solo Intrant (nunca recrea EDESUR)."""
     if MODO_SOLO_INTRANT:
         asegurar_modo_solo_intrant()
         clientes = cargar_clientes()
@@ -5843,7 +5843,7 @@ TRANSCRIPCIÓN COMPLETA:
 {transcripcion_completa}
 
 ===============================================
-GENERADO POR: Video Analyzer IA v5.6
+GENERADO POR: Video Analyzer IA v5.7
 ===============================================
 """
             
@@ -6584,7 +6584,7 @@ def generar_md_sesion_coincidencias(
         # ============================
         md.append(f"# 🎯 Reporte de Sesión - Coincidencias Detectadas")
         md.append(f"")
-        md.append(f"> **Video Analyzer IA v5.6** | Sesión: {fecha_legible}")
+        md.append(f"> **Video Analyzer IA v5.7** | Sesión: {fecha_legible}")
         md.append(f"")
         md.append(f"---")
         md.append(f"")
@@ -6769,7 +6769,7 @@ def generar_md_sesion_coincidencias(
         # ============================
         # PIE
         # ============================
-        md.append(f"_Reporte generado automáticamente por Video Analyzer IA v5.6 - {fecha_legible}_")
+        md.append(f"_Reporte generado automáticamente por Video Analyzer IA v5.7 - {fecha_legible}_")
         
         # === ESCRIBIR ARCHIVO ===
         contenido_final = "\n".join(md)
@@ -7850,7 +7850,7 @@ def generar_html_resumen_diario(coincidencias, cliente_nombre, corte_label, fech
         <!-- Footer -->
         <div style="background: #343a40; color: white; padding: 20px; border-radius: 0 0 16px 16px; text-align: center;">
             <p style="margin: 4px 0; opacity: 0.8; font-size: 13px;">
-                🤖 Resumen generado automáticamente por Video Analyzer IA v5.6
+                🤖 Resumen generado automáticamente por Video Analyzer IA v5.7
             </p>
             <p style="margin: 4px 0; opacity: 0.6; font-size: 12px;">
                 {datetime.now().strftime('%d/%m/%Y %H:%M:%S')} &middot; {cliente_nombre}
@@ -8612,7 +8612,7 @@ def enviar_clips_a_telegram(clips_generados, resumen, terminos_detectados, video
 📋 *RESUMEN EJECUTIVO:*
 {resumen}
 
-🌐 *Servidor:* Analizador de Videos IA v5.6
+🌐 *Servidor:* Analizador de Videos IA v5.7
 
 ⬇️ *Videos a continuación...*"""
         
@@ -8729,7 +8729,7 @@ def test_telegram_connection():
 
 ✅ Bot conectado correctamente
 ⏰ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-🤖 Analizador de Videos IA v5.6
+🤖 Analizador de Videos IA v5.7
 
 Este es un mensaje de prueba."""
     
@@ -8862,7 +8862,7 @@ def init_session_state():
     except Exception:
         pass
 
-# v5.6: purgar EDESUR/MINERD/Presidencia antes de la UI
+# v5.7: purgar EDESUR/MINERD/Presidencia antes de la UI
 try:
     asegurar_modo_solo_intrant()
 except Exception as _e_solo:
@@ -9124,9 +9124,9 @@ with col5:
     else:
         st.warning("📧 **Brevo** ⚠️\nNo configurado")
     
-st.title("🎬 Análisis Automático de Videos — v5.6 Intrant ✅")
+st.title("🎬 Análisis Automático de Videos — v5.7 Intrant ✅")
 st.info(
-    f"🧠 **v5.6 Intrant** | Solo cliente **Intrant** (sin EDESUR/MINERD/Presidencia). "
+    f"🧠 **v5.7 Intrant** | Solo cliente **Intrant** (sin EDESUR/MINERD/Presidencia). "
     f"Cadena: Kimi → GLM → Gemini/GPT-4o → DeepSeek. Preferido: **{obtener_etiqueta_motor_sesion()}**. "
     "Lun–vie: horarios de escaneo (sidebar). **06:00–09:00**, **21:00–24:00** y sáb/dom y CDN/TRA: todos."
 )
@@ -14633,7 +14633,7 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                         f.write(f"Fecha creación: {datetime.now().isoformat()}\n")
                         f.write(f"Archivo origen: {rel} ({tipo_archivo})\n")
                         f.write(f"Términos buscados: {', '.join(terminos_nombres)}\n")
-                        f.write(f"Generado por: Video Analyzer IA v5.6\n")
+                        f.write(f"Generado por: Video Analyzer IA v5.7\n")
             
                 # ========== GUARDAR TRANSCRIPCIÓN COMPLETA DEL VIDEO ==========
                 transcripcion_completa_path = os.path.join(archivo_main_dir, "TRANSCRIPCION_COMPLETA.txt")
@@ -14664,7 +14664,7 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                             f.write(f"- Total de palabras: {len(transcripcion_mistral.split())}\n")
                             f.write(f"- Total de caracteres: {len(transcripcion_mistral)}\n")
                             f.write(f"\n{'='*80}\n")
-                            f.write(f"✅ Generado automáticamente por Video Analyzer IA v5.6\n")
+                            f.write(f"✅ Generado automáticamente por Video Analyzer IA v5.7\n")
                     
                         log_info(f"✅ Transcripción completa guardada: {transcripcion_completa_path}", func_name)
                         if not mostrar_solo_relevantes:
@@ -16649,7 +16649,7 @@ with tab4:
         st.markdown("### 🏢 Entidades y Rutas de Envío")
     with col_header2:
         if MODO_SOLO_INTRANT:
-            st.caption("v5.6: solo Intrant")
+            st.caption("v5.7: solo Intrant")
         elif st.button("➕ Nueva Entidad", type="primary", key="btn_abrir_nueva"):
             st.session_state['mostrar_form_nueva'] = not st.session_state.get('mostrar_form_nueva', False)
     

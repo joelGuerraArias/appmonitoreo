@@ -2,6 +2,11 @@
 
 ## 📌 Cambios automáticos
 
+- [2026-08-05 09:17] FEAT: Video Analyzer v5.7
+  - Misma base v5.6 + corrección ortográfica en transcripciones (avinader→abinader) y `abinader` fuera de la lista de búsqueda.
+
+---
+
 - [2026-08-05 08:20] FEAT: Video Analyzer v5.6
   - Normalización abinader/digesett, espera vacía 6 min, Analisishoy obligatorio, checklist de canales, blindaje Intrant, enlaces Cloudinary+R2 en correo.
 

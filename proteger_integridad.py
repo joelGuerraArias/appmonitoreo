@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Blindaje de arranque — Video Analyzer v5.6 Intrant
+Blindaje de arranque — Video Analyzer v5.7 Intrant
 ==================================================
 Restaura archivos críticos si Cursor/disco los deja en 0 bytes o “válidos pero inútiles”
 (p. ej. Intrant con Brevo/Telegram apagados y sin API key).

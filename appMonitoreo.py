@@ -957,6 +957,23 @@ def normalizar_nombre_termino(termino):
     return NORMALIZAR_TERMINO_CANONICO.get(raw.lower(), raw)
 
 
+def corregir_ortografia_terminos_en_texto(texto):
+    """Reescribe en el texto variantes ASR (avinader→abinader, zed/DGC→digesett, …)."""
+    if not texto:
+        return texto
+    out = str(texto)
+    for wrong, right in NORMALIZAR_TERMINO_CANONICO.items():
+        def _repl(m, _right=right):
+            s = m.group(0)
+            if s.isupper():
+                return _right.upper()
+            if s[0].isupper():
+                return _right[:1].upper() + _right[1:]
+            return _right
+        out = re.sub(rf"\b{re.escape(wrong)}\b", _repl, out, flags=re.IGNORECASE)
+    return out
+
+
 def _purgar_terminos_solo_intrant():
     """Deja en terminos_guardados.json únicamente términos Intrant canónicos."""
     func_name = "_purgar_terminos_solo_intrant"
@@ -14559,6 +14576,12 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                     transcripcion_mistral, api_usada, segments_timestamps = transcribir_audio_hibrido(
                         audio_path, indice_actual=i+1, total=total_pasada
                     )
+                    # Corregir ortografía ASR en texto (avinader→abinader, zed/dgc→digesett)
+                    transcripcion_mistral = corregir_ortografia_terminos_en_texto(transcripcion_mistral)
+                    if segments_timestamps:
+                        for _seg in segments_timestamps:
+                            if isinstance(_seg, dict) and _seg.get("text"):
+                                _seg["text"] = corregir_ortografia_terminos_en_texto(_seg["text"])
                     if not mostrar_solo_relevantes:
                         st.info(f"🎯 Transcripción completada con {api_usada} — **{i+1}/{total_pasada}**")
                 except Exception as e:

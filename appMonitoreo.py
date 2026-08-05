@@ -548,7 +548,6 @@ TERMINOS_INTRANT_CANONICOS = (
     "morrison",
     "digesett",
     "erredevial",
-    "abinader",
     "motoristas",
 )
 
@@ -14663,9 +14662,8 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                     'morrison': ['morison', 'morisón', 'morrisón'],
                     'milton morrison': ['milton morison', 'milton morisón', 'milton morrisón'],
                     'motoristas': ['motorista'],
-                    # Abinader (ASR: avinader / aminader)
-                    'abinader': ['avinader', 'aminader', 'a binader', 'abi nader'],
                     # DIGESETT (ASR: zed / DGC / digest / digeset)
+                    # avinader/aminader → abinader solo vía normalizar_nombre_termino (NO es término de búsqueda)
                     'digesett': [
                         'zed', 'dgc', 'digest', 'digeset', 'digesettt',
                         'dige sett', 'dige set', 'di gesett',
@@ -14747,7 +14745,6 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                     'intrant', 'intran',
                     'milton morrison', 'morrison',
                     'digesett', 'digest', 'digeset', 'zed', 'dgc',
-                    'abinader', 'avinader', 'aminader',
                     'erredevial',
                 }
             

@@ -21,15 +21,12 @@
       "cliente_id": "intrant"
     },
     {
-      "termino": "abinader",
-      "cliente_id": "intrant"
-    },
-    {
       "termino": "motoristas",
       "cliente_id": "intrant"
     }
   ],
-  "fecha_actualizacion": "2026-08-05T08:05:00",
-  "total_terminos": 7,
-  "modo": "solo_intrant"
+  "fecha_actualizacion": "2026-08-05T08:20:00",
+  "total_terminos": 6,
+  "modo": "solo_intrant",
+  "version": "5.6"
 }

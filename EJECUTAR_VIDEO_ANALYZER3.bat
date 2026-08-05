@@ -4,11 +4,17 @@ title Video Analyzer 4 - Inicio rapido
 
 echo.
 echo ==============================================
-echo   INICIANDO VIDEO ANALYZER 4 (mismo script v3, UI v4)
+echo   INICIANDO VIDEO ANALYZER 4 (blindado)
 echo ==============================================
 echo.
 
 cd /d "%~dp0"
+
+if exist "venv_new\Scripts\python.exe" (
+    "venv_new\Scripts\python.exe" proteger_integridad.py
+) else (
+    python proteger_integridad.py
+)
 
 if exist "venv_new\Scripts\activate.bat" (
     call "venv_new\Scripts\activate.bat"
@@ -37,11 +43,19 @@ if not exist "appMonitoreo.py" (
 )
 
 echo Entorno activado.
-echo Ejecutando: streamlit run appMonitoreo.py
+echo Ejecutando: python -m streamlit run appMonitoreo.py
 echo URL esperada: http://localhost:8501
 echo.
 
-streamlit run appMonitoreo.py
+netstat -ano | findstr ":8501" | findstr "LISTENING" >nul
+if %ERRORLEVEL%==0 (
+    echo Streamlit ya esta corriendo en el puerto 8501.
+    start "" "http://localhost:8501/?v=55"
+    pause
+    exit /b 0
+)
+
+python -m streamlit run appMonitoreo.py --server.port 8501
 
 echo.
 echo Aplicacion cerrada.

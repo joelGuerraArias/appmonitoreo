@@ -1,1 +1,10 @@
-../radioAnalizer/
+﻿../radioAnalizer/
+
+# Secretos e integridad — Cursor Undo Diff los vació (2026-08-03)
+.env
+.env.*
+!.env.example
+backups/
+clientes_config.json
+clientes_config.bak*
+terminos_guardados.bak*

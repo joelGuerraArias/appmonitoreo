@@ -538,19 +538,56 @@ CLOUDINARY_CONFIG = os.path.join(CARPETA_PROCESADOS, "cloudinary_config.json")  
 BUNNY_CONFIG = os.path.join(CARPETA_PROCESADOS, "bunny_config.json")  # Configuración de Bunny.net Storage
 CACHE_ESCANEO = os.path.join(CARPETA_PROCESADOS, "cache_escaneo.json")  # Caché de archivos escaneados
 CLIENTES_CONFIG = str(_DIR_SCRIPT / "clientes_config.json")
-# v5.5 Intrant: un solo cliente. Evita reaparición de EDESUR/MINERD/Presidencia y correos ajenos.
-APP_VERSION = "5.5"
+# v5.6 Intrant: un solo cliente. Evita reaparición de EDESUR/MINERD/Presidencia y correos ajenos.
+APP_VERSION = "5.6"
 MODO_SOLO_INTRANT = True
 CLIENTE_ID_UNICO = "intrant"
 TERMINOS_INTRANT_CANONICOS = (
     "intrant",
     "milton morrison",
     "morrison",
-    "digest",
+    "digesett",
     "erredevial",
-    "digeset",
+    "abinader",
     "motoristas",
 )
+
+# Variantes ASR / errores frecuentes → término canónico (reportes y envíos)
+NORMALIZAR_TERMINO_CANONICO = {
+    "avinader": "abinader",
+    "aminader": "abinader",
+    "zed": "digesett",
+    "dgc": "digesett",
+    "digest": "digesett",
+    "digeset": "digesett",
+}
+
+# Blindaje temprano (antes de lógica de clientes): restaura .env/JSON vaciados por Cursor/disco
+try:
+    import proteger_integridad as _proteger_integridad
+    _proteger_integridad.proteger(check_only=False)
+    # Si se restauró .env, recargar variables (las de arriba pudieron leer vacío)
+    try:
+        from dotenv import load_dotenv as _load_dotenv_reload
+        _load_dotenv_reload(dotenv_path=str(_DIR_SCRIPT / ".env"), override=True)
+    except Exception:
+        pass
+    GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', '') or GOOGLE_CLIENT_ID
+    GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET', '') or GOOGLE_CLIENT_SECRET
+    GOOGLE_REFRESH_TOKEN = os.getenv('GOOGLE_REFRESH_TOKEN', '') or GOOGLE_REFRESH_TOKEN
+    GOOGLE_DRIVE_FOLDER_ID = os.getenv('GOOGLE_DRIVE_FOLDER_ID', '') or GOOGLE_DRIVE_FOLDER_ID
+    if not os.getenv('GEMINI_API_KEY') and GEMINI_API_KEY:
+        pass
+    else:
+        _gk = os.getenv('GEMINI_API_KEY', '')
+        if _gk and _gk != GEMINI_API_KEY:
+            GEMINI_API_KEY = _gk
+except Exception as _e_blindaje:
+    try:
+        logging.getLogger("VideoAnalyzer").warning("Blindaje integridad: %s", _e_blindaje)
+    except Exception:
+        print(f"[WARN] Blindaje integridad: {_e_blindaje}")
+
 TAMANO_MINIMO_BYTES = 8 * 1024 * 1024  # 8 MB: umbral preferido antes de procesar
 TAMANO_CORRUPTO_BYTES = 100 * 1024  # <100 KB estable → incompleto/basura (no dejar en carpeta)
 GRACIA_ESCRITURA_VIDEO_SEG = 90  # segundos sin modificar = ya no está grabando
@@ -771,19 +808,42 @@ def generar_id_cliente():
     import uuid
     return str(uuid.uuid4())[:8]
 
+def _leer_json_archivo(path, default=None):
+    """Lee JSON; si el archivo está vacío/corrupto (p. ej. vaciado por Cursor), devuelve default."""
+    if default is None:
+        default = {}
+    try:
+        if not os.path.exists(path):
+            return default
+        with open(path, 'r', encoding='utf-8-sig') as f:
+            raw = f.read()
+        if not raw.strip():
+            return default
+        data = json.loads(raw)
+        return data if data is not None else default
+    except Exception:
+        return default
+
+
 def cargar_clientes():
     """Carga la lista de clientes configurados"""
     try:
         if os.path.exists(CLIENTES_CONFIG):
-            with open(CLIENTES_CONFIG, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                clientes = data.get('clientes', [])
-                if MODO_SOLO_INTRANT:
-                    return [
-                        c for c in clientes
-                        if (c.get('id') or '').strip().lower() == CLIENTE_ID_UNICO
-                    ]
-                return clientes
+            data = _leer_json_archivo(CLIENTES_CONFIG, {})
+            if not data:
+                # Archivo vacío/corrupto: intentar backup local
+                bak = _DIR_SCRIPT / "backups" / "clientes_config_latest.json"
+                if bak.exists():
+                    data = _leer_json_archivo(str(bak), {})
+                    if data.get('clientes'):
+                        log_warning("clientes_config.json vacío/corrupto; usando backups/clientes_config_latest.json", "cargar_clientes")
+            clientes = data.get('clientes', []) if isinstance(data, dict) else []
+            if MODO_SOLO_INTRANT:
+                return [
+                    c for c in clientes
+                    if (c.get('id') or '').strip().lower() == CLIENTE_ID_UNICO
+                ]
+            return clientes
     except Exception as e:
         log_exception("cargar_clientes", e)
     return []
@@ -796,6 +856,9 @@ def guardar_clientes(clientes):
                 c for c in (clientes or [])
                 if (c.get('id') or '').strip().lower() == CLIENTE_ID_UNICO
             ]
+            # Nunca persistir Intrant con canales apagados si hay credenciales
+            for c in clientes:
+                _forzar_canales_intrant_activos(c)
         data = {
             'clientes': clientes,
             'fecha_actualizacion': datetime.now().isoformat(),
@@ -803,8 +866,32 @@ def guardar_clientes(clientes):
             'modo': 'solo_intrant' if MODO_SOLO_INTRANT else 'multi',
             'version': APP_VERSION,
         }
+        # Quitar ReadOnly (el blindaje antiguo lo ponía y luego la app no podía guardar)
+        try:
+            if os.path.exists(CLIENTES_CONFIG):
+                os.chmod(CLIENTES_CONFIG, 0o666)
+        except OSError:
+            pass
         with open(CLIENTES_CONFIG, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
+        # Refrescar latest + golden solo si Intrant es usable
+        try:
+            bak_dir = _DIR_SCRIPT / "backups"
+            bak_dir.mkdir(exist_ok=True)
+            if MODO_SOLO_INTRANT and clientes:
+                b = (clientes[0].get('brevo') or {})
+                tg = (clientes[0].get('telegram') or {})
+                usable = bool(
+                    b.get('enabled') and (b.get('api_key') or '').strip()
+                    and (b.get('correos_destinatarios') or [])
+                    and tg.get('enabled') and (tg.get('bot_token') or '').strip()
+                )
+                if usable:
+                    payload = json.dumps(data, indent=2, ensure_ascii=False)
+                    (bak_dir / "clientes_config_latest.json").write_text(payload, encoding='utf-8')
+                    (bak_dir / "clientes_config_intrant_golden.json").write_text(payload, encoding='utf-8')
+        except Exception:
+            pass
         return True
     except Exception as e:
         log_exception("guardar_clientes", e)
@@ -863,8 +950,16 @@ def _plantilla_cliente_intrant_vacia():
     }
 
 
+def normalizar_nombre_termino(termino):
+    """Corrige variantes ASR al canónico Intrant (abinader, digesett, …)."""
+    raw = (termino or "").strip()
+    if not raw:
+        return raw
+    return NORMALIZAR_TERMINO_CANONICO.get(raw.lower(), raw)
+
+
 def _purgar_terminos_solo_intrant():
-    """Deja en terminos_guardados.json únicamente términos Intrant."""
+    """Deja en terminos_guardados.json únicamente términos Intrant canónicos."""
     func_name = "_purgar_terminos_solo_intrant"
     try:
         if not os.path.exists(TERMINOS_CONFIG):
@@ -873,24 +968,7 @@ def _purgar_terminos_solo_intrant():
             with open(TERMINOS_CONFIG, 'r', encoding='utf-8') as f:
                 data = json.load(f)
         terminos = data.get('terminos') or []
-        keep = []
-        seen = set()
-        for t in terminos:
-            if isinstance(t, dict):
-                nombre = (t.get('termino') or '').strip()
-                cid = (t.get('cliente_id') or '').strip().lower()
-                if cid == CLIENTE_ID_UNICO and nombre:
-                    key = nombre.lower()
-                    if key not in seen:
-                        seen.add(key)
-                        keep.append({'termino': nombre, 'cliente_id': CLIENTE_ID_UNICO})
-            elif isinstance(t, str) and t.strip().lower() in {x.lower() for x in TERMINOS_INTRANT_CANONICOS}:
-                key = t.strip().lower()
-                if key not in seen:
-                    seen.add(key)
-                    keep.append({'termino': t.strip(), 'cliente_id': CLIENTE_ID_UNICO})
-        if not keep:
-            keep = [{'termino': n, 'cliente_id': CLIENTE_ID_UNICO} for n in TERMINOS_INTRANT_CANONICOS]
+        keep = [{'termino': n, 'cliente_id': CLIENTE_ID_UNICO} for n in TERMINOS_INTRANT_CANONICOS]
         if keep != terminos:
             bak = str(_DIR_SCRIPT / f"terminos_guardados.bak_auto_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
             try:
@@ -923,8 +1001,11 @@ def asegurar_modo_solo_intrant():
     try:
         raw = []
         if os.path.exists(CLIENTES_CONFIG):
-            with open(CLIENTES_CONFIG, 'r', encoding='utf-8') as f:
-                raw = (json.load(f) or {}).get('clientes') or []
+            data = _leer_json_archivo(CLIENTES_CONFIG, {})
+            if not data:
+                log_warning("clientes_config.json vacío/corrupto al arrancar; se reconstruye Intrant", func_name)
+            else:
+                raw = (data or {}).get('clientes') or []
         intrant = None
         otros = []
         for c in raw:
@@ -942,10 +1023,14 @@ def asegurar_modo_solo_intrant():
             log_warning(f"Modo solo Intrant: eliminados clientes {otros} (backup {os.path.basename(bak)})", func_name)
         if not intrant:
             # Recuperar desde backup reciente si existe
-            for cand in sorted(_DIR_SCRIPT.glob('clientes_config.bak*.json'), reverse=True):
+            candidatos = []
+            bak_dir = _DIR_SCRIPT / "backups"
+            if bak_dir.is_dir():
+                candidatos.extend(sorted(bak_dir.glob("clientes_config*.json"), reverse=True))
+            candidatos.extend(sorted(_DIR_SCRIPT.glob("clientes_config.bak*.json"), reverse=True))
+            for cand in candidatos:
                 try:
-                    with open(cand, 'r', encoding='utf-8') as f:
-                        blob = json.load(f)
+                    blob = _leer_json_archivo(str(cand), {})
                     for c in blob.get('clientes') or []:
                         if (c.get('id') or '').strip().lower() == CLIENTE_ID_UNICO:
                             intrant = c
@@ -967,18 +1052,482 @@ def asegurar_modo_solo_intrant():
             brevo['smtp_user'] = '951480002@smtp-brevo.com'
         brevo.setdefault('smtp_server', 'smtp-relay.brevo.com')
         brevo.setdefault('smtp_port', 587)
-        # Persistir solo Intrant (aunque ya estuviera solo: alinea flags)
-        if len(raw) != 1 or otros or (raw and (raw[0].get('id') or '').lower() != CLIENTE_ID_UNICO):
+
+        # Si Intrant quedó sin credenciales/canales (JSON vaciado), recuperar desde backup bueno
+        canales_rotos = _intrant_canales_incompletos(intrant)
+        if canales_rotos:
+            recuperado = _recuperar_intrant_canales_desde_backup(intrant)
+            if recuperado:
+                intrant = recuperado
+                log_warning(
+                    f"Intrant tenía canales incompletos/apagados ({', '.join(canales_rotos)}); "
+                    f"restaurados desde backup",
+                    func_name,
+                )
+            # Forzar enabled en canales con credenciales
+            _forzar_canales_intrant_activos(intrant)
+
+        # Siempre persistir Intrant si el JSON estaba vacío, incompleto o con canales apagados
+        necesita_guardar = (
+            not raw
+            or len(raw) != 1
+            or bool(otros)
+            or (raw and (raw[0].get('id') or '').lower() != CLIENTE_ID_UNICO)
+            or (raw and (not raw[0].get('incluir_en_analisis', False) or not raw[0].get('activo', True)))
+            or bool(canales_rotos)
+        )
+        if necesita_guardar:
             guardar_clientes([intrant])
-        elif not raw[0].get('incluir_en_analisis', False) or not raw[0].get('activo', True):
-            guardar_clientes([intrant])
+            try:
+                bak_latest = _DIR_SCRIPT / "backups" / "clientes_config_latest.json"
+                bak_latest.parent.mkdir(exist_ok=True)
+                with open(bak_latest, 'w', encoding='utf-8') as f:
+                    json.dump({'clientes': [intrant], 'modo': 'solo_intrant', 'version': APP_VERSION}, f, indent=2, ensure_ascii=False)
+            except Exception:
+                pass
         _purgar_terminos_solo_intrant()
     except Exception as e:
         log_exception(func_name, e)
 
 
+def _intrant_canales_incompletos(intrant):
+    """Lista de canales Intrant apagados o sin credenciales mínimas."""
+    rotos = []
+    b = intrant.get('brevo') or {}
+    if not b.get('enabled') or not (b.get('api_key') or '').strip() or not (b.get('correos_destinatarios') or []):
+        rotos.append('brevo')
+    tg = intrant.get('telegram') or {}
+    if not tg.get('enabled') or not (tg.get('bot_token') or '').strip():
+        rotos.append('telegram')
+    gd = intrant.get('google_drive') or {}
+    if not gd.get('enabled'):
+        rotos.append('google_drive')
+    gs = intrant.get('google_sheets') or {}
+    if not gs.get('enabled') or not (gs.get('spreadsheet_id') or '').strip():
+        rotos.append('google_sheets')
+    cl = intrant.get('cloudinary') or {}
+    if not cl.get('enabled') or not (cl.get('cloud_name') or '').strip():
+        rotos.append('cloudinary')
+    return rotos
+
+
+def _recuperar_intrant_canales_desde_backup(intrant):
+    """Copia canales útiles desde el mejor backup disponible hacia Intrant."""
+    candidatos = []
+    # Preferir backup multi-cliente pre-v5.5 (tiene Intrant completo)
+    preferidos = [
+        _DIR_SCRIPT / "backups" / "clientes_config_intrant_golden.json",
+        _DIR_SCRIPT / "clientes_config.bak_pre_v5.5_multiclient.json",
+        _DIR_SCRIPT / "clientes_config.bak_before_repair_20260714_212903.json",
+        _DIR_SCRIPT / "backups" / "clientes_config_latest.json",
+    ]
+    for p in preferidos:
+        if p.is_file() and p.stat().st_size > 500:
+            candidatos.append(p)
+    bak_dir = _DIR_SCRIPT / "backups"
+    if bak_dir.is_dir():
+        candidatos.extend(sorted(bak_dir.glob("clientes_config*.json"), reverse=True))
+    candidatos.extend(sorted(_DIR_SCRIPT.glob("clientes_config.bak*.json"), reverse=True))
+
+    for cand in candidatos:
+        try:
+            blob = _leer_json_archivo(str(cand), {})
+            for c in blob.get('clientes') or []:
+                if (c.get('id') or '').strip().lower() != CLIENTE_ID_UNICO:
+                    continue
+                # Solo usar si el backup tiene Brevo usable
+                b = c.get('brevo') or {}
+                if not (b.get('api_key') or '').strip() or not (b.get('correos_destinatarios') or []):
+                    continue
+                for key in (
+                    'brevo', 'telegram', 'google_drive', 'google_sheets',
+                    'cloudinary', 'r2', 'supabase', 'webhook',
+                ):
+                    if key in c and isinstance(c.get(key), dict):
+                        intrant[key] = json.loads(json.dumps(c[key]))  # deep copy
+                _forzar_canales_intrant_activos(intrant)
+                log_info(f"Canales Intrant recuperados desde {cand.name}", "asegurar_modo_solo_intrant")
+                return intrant
+        except Exception:
+            continue
+    return None
+
+
+def _forzar_canales_intrant_activos(intrant):
+    """Activa canales Intrant cuando hay credenciales (nada debe quedar omitido por enabled=false)."""
+    b = intrant.setdefault('brevo', {})
+    if (b.get('api_key') or '').strip() and (b.get('sender_email') or '').strip() and (b.get('correos_destinatarios') or []):
+        b['enabled'] = True
+    tg = intrant.setdefault('telegram', {})
+    if (tg.get('bot_token') or '').strip() and (tg.get('chat_id') or '').strip():
+        tg['enabled'] = True
+    gd = intrant.setdefault('google_drive', {})
+    if (gd.get('folder_id') or '').strip() or gd.get('enabled') is not False:
+        # Si hay folder_id o ya venía del backup, activar
+        if (gd.get('folder_id') or '').strip():
+            gd['enabled'] = True
+    gs = intrant.setdefault('google_sheets', {})
+    if (gs.get('spreadsheet_id') or '').strip():
+        gs['enabled'] = True
+    cl = intrant.setdefault('cloudinary', {})
+    if (cl.get('cloud_name') or '').strip() and (cl.get('api_key') or '').strip():
+        cl['enabled'] = True
+    r2 = intrant.setdefault('r2', {})
+    r2['enabled'] = True
+    sb = intrant.setdefault('supabase', {})
+    if (sb.get('url') or '').strip() or SUPABASE_URL:
+        sb['enabled'] = True
+    intrant['activo'] = True
+    intrant['incluir_en_analisis'] = True
+
+
+def revisar_estado_canales_intrant(reparar=True):
+    """
+    Revisa Intrant al inicio de sesión: fuerza canales con credenciales y
+    devuelve un checklist listo para UI / bloqueo de arranque.
+    """
+    func_name = "revisar_estado_canales_intrant"
+    items = []
+    cliente = None
+    try:
+        if reparar:
+            try:
+                asegurar_modo_solo_intrant()
+            except Exception as e_solo:
+                log_warning(f"asegurar_modo_solo_intrant en checklist: {e_solo}", func_name)
+        cliente = obtener_cliente_por_id(CLIENTE_ID_UNICO) or obtener_cliente_default()
+        if cliente:
+            _forzar_canales_intrant_activos(cliente)
+            if reparar and _intrant_canales_incompletos(cliente):
+                recuperado = _recuperar_intrant_canales_desde_backup(cliente)
+                if recuperado:
+                    cliente = recuperado
+                    _forzar_canales_intrant_activos(cliente)
+                    guardar_clientes([cliente])
+                    log_warning("Checklist inicio: Intrant reparado desde backup", func_name)
+            elif reparar:
+                guardar_clientes([cliente])
+    except Exception as e:
+        log_exception(func_name, e, "Error revisando canales Intrant")
+
+    def _add(cid, label, activo, detalle, critico=True):
+        items.append({
+            "id": cid,
+            "label": label,
+            "activo": bool(activo),
+            "detalle": detalle or "",
+            "critico": bool(critico),
+        })
+
+    if not cliente:
+        _add("intrant", "Cliente Intrant", False, "No se pudo cargar Intrant", True)
+    else:
+        _add(
+            "intrant",
+            "Cliente Intrant",
+            bool(cliente.get("activo") and cliente.get("incluir_en_analisis")),
+            f"activo={cliente.get('activo')} · en análisis={cliente.get('incluir_en_analisis')}",
+            True,
+        )
+        tg = cliente.get("telegram") or {}
+        _add(
+            "telegram",
+            "Telegram",
+            bool(tg.get("enabled") and (tg.get("bot_token") or "").strip() and (tg.get("chat_id") or "").strip()),
+            f"chat={tg.get('chat_id') or '—'} · token={'sí' if (tg.get('bot_token') or '').strip() else 'NO'}",
+            True,
+        )
+        b = cliente.get("brevo") or {}
+        n_dest = len(b.get("correos_destinatarios") or [])
+        _add(
+            "brevo",
+            "Correo (Brevo)",
+            bool(b.get("enabled") and (b.get("api_key") or "").strip() and n_dest > 0 and (b.get("sender_email") or "").strip()),
+            f"from={b.get('sender_email') or '—'} · dest={n_dest} · api={'sí' if (b.get('api_key') or '').strip() else 'NO'}",
+            True,
+        )
+        gd = cliente.get("google_drive") or {}
+        _add(
+            "google_drive",
+            "Google Drive",
+            bool(gd.get("enabled") and ((gd.get("folder_id") or "").strip() or (GOOGLE_DRIVE_FOLDER_ID or "").strip())),
+            f"folder={((gd.get('folder_id') or GOOGLE_DRIVE_FOLDER_ID) or '—')[:24]}…",
+            True,
+        )
+        gs = cliente.get("google_sheets") or {}
+        _add(
+            "google_sheets",
+            "Google Sheets",
+            bool(gs.get("enabled") and (gs.get("spreadsheet_id") or "").strip()),
+            f"sheet={((gs.get('spreadsheet_id') or '')[:20] or '—')}… · rango={gs.get('range') or '—'}",
+            True,
+        )
+        sb = cliente.get("supabase") or {}
+        _add(
+            "supabase",
+            "Supabase",
+            bool(sb.get("enabled") and ((sb.get("url") or "").strip() or SUPABASE_URL)),
+            f"url={'sí' if ((sb.get('url') or '').strip() or SUPABASE_URL) else 'NO'}",
+            True,
+        )
+        cl = cliente.get("cloudinary") or {}
+        _add(
+            "cloudinary",
+            "Cloudinary",
+            bool(cl.get("enabled") and (cl.get("cloud_name") or "").strip() and (cl.get("api_key") or "").strip()),
+            f"cloud={cl.get('cloud_name') or '—'}",
+            False,
+        )
+        r2 = cliente.get("r2") or {}
+        _add(
+            "r2",
+            "Cloudflare R2",
+            bool(r2.get("enabled")),
+            f"folder={r2.get('folder') or '—'}",
+            False,
+        )
+        wh = cliente.get("webhook") or {}
+        wh_ok = bool(wh.get("enabled") and (wh.get("url") or "").strip())
+        _add(
+            "webhook",
+            "Webhook",
+            wh_ok,
+            (wh.get("url") or "sin URL (opcional)")[:80],
+            False,
+        )
+
+    env_ok = bool((os.getenv("GOOGLE_REFRESH_TOKEN") or GOOGLE_REFRESH_TOKEN or "").strip())
+    _add(
+        "env_google",
+        ".env Google OAuth",
+        env_ok,
+        "GOOGLE_REFRESH_TOKEN " + ("presente" if env_ok else "FALTA"),
+        True,
+    )
+    try:
+        os.makedirs(CARPETA_PROCESADOS, exist_ok=True)
+        _nombre_ah, _ruta_ah, _ = _rutas_analisishoy_hoy()
+        carpeta_ok = os.path.isdir(CARPETA_PROCESADOS)
+    except Exception:
+        carpeta_ok = False
+        _nombre_ah = "Analisishoy_YYYYMMDD.md"
+    _add(
+        "analisishoy",
+        "Analisishoy (carpeta writable)",
+        carpeta_ok,
+        f"hoy → `{_nombre_ah}` en `{CARPETA_PROCESADOS}`",
+        True,
+    )
+    terminos_n = 0
+    try:
+        if os.path.exists(TERMINOS_CONFIG):
+            with open(TERMINOS_CONFIG, "r", encoding="utf-8") as f:
+                terminos_n = len((json.load(f) or {}).get("terminos") or [])
+    except Exception:
+        terminos_n = 0
+    _add(
+        "terminos",
+        "Términos Intrant",
+        terminos_n > 0,
+        f"{terminos_n} término(s) en terminos_guardados.json",
+        True,
+    )
+
+    criticos_mal = [i for i in items if i["critico"] and not i["activo"]]
+    ok_criticos = len(criticos_mal) == 0
+    n_ok = sum(1 for i in items if i["activo"])
+    resumen = (
+        f"{n_ok}/{len(items)} activos"
+        + ("" if ok_criticos else f" · FALTAN críticos: {', '.join(i['label'] for i in criticos_mal)}")
+    )
+    log_info(f"Checklist inicio sesión: {resumen}", func_name)
+    return {
+        "ok_criticos": ok_criticos,
+        "cliente": cliente,
+        "items": items,
+        "resumen": resumen,
+        "criticos_mal": [i["label"] for i in criticos_mal],
+    }
+
+
+def mostrar_checklist_canales_inicio(forzar=False):
+    """Lista en la UI el estado de canales ANTES de iniciar el monitoreo."""
+    estado = revisar_estado_canales_intrant(reparar=True)
+    st.session_state["checklist_canales_estado"] = estado
+    st.session_state["checklist_canales_visto"] = True
+
+    st.markdown("## ✅ Checklist de sesión — canales Intrant")
+    st.caption(
+        "Revisión automática **antes de iniciar**. Si todo está correcto se avisa por Telegram y a autosemana@gmail.com."
+    )
+    if estado["ok_criticos"]:
+        st.success(f"**Todo listo para iniciar.** {estado['resumen']}")
+    else:
+        st.error(
+            f"**No inicies aún:** faltan canales críticos → "
+            f"{', '.join(estado['criticos_mal'])}. "
+            f"Ejecuta `proteger_integridad.py` o restaura `backups/clientes_config_intrant_golden.json`."
+        )
+
+    cols = st.columns(2)
+    for idx, item in enumerate(estado["items"]):
+        with cols[idx % 2]:
+            icon = "✅" if item["activo"] else ("❌" if item["critico"] else "⚪")
+            marca = " (crítico)" if item["critico"] else " (opcional)"
+            st.markdown(f"{icon} **{item['label']}**{marca}")
+            st.caption(item["detalle"])
+
+    # Aviso Telegram + autosemana (una vez por sesión cuando todo OK, o al fallar críticos)
+    try:
+        avisos = notificar_inicio_sesion_canales(estado, forzar=forzar)
+        st.session_state["checklist_avisos_inicio"] = avisos
+        if avisos.get("telegram"):
+            ok_tg, msg_tg = avisos["telegram"]
+            if ok_tg:
+                st.info(f"📱 Telegram (inicio): {msg_tg}")
+            else:
+                st.warning(f"📱 Telegram (inicio): {msg_tg}")
+        if avisos.get("email"):
+            ok_em, msg_em = avisos["email"]
+            if ok_em:
+                st.info(f"📧 Correo autosemana (inicio): {msg_em}")
+            else:
+                st.warning(f"📧 Correo autosemana (inicio): {msg_em}")
+        if avisos.get("omitido"):
+            st.caption(avisos["omitido"])
+    except Exception as e_av:
+        st.warning(f"⚠️ No se pudo enviar aviso de inicio: {e_av}")
+        log_warning(f"Aviso inicio sesión: {e_av}", "mostrar_checklist_canales_inicio")
+
+    st.markdown("---")
+    return estado
+
+
+def notificar_inicio_sesion_canales(estado, forzar=False):
+    """
+    Si el checklist crítico está OK → Telegram Intrant + correo a autosemana@gmail.com.
+    Si falla → también avisa (una vez) para que sepas qué falta.
+    Una sola vez por sesión Streamlit (salvo forzar=True en re-verificar).
+    """
+    func_name = "notificar_inicio_sesion_canales"
+    out = {"telegram": None, "email": None, "omitido": None}
+    ok = bool((estado or {}).get("ok_criticos"))
+    clave = "aviso_inicio_ok_enviado" if ok else "aviso_inicio_fail_enviado"
+
+    if not forzar and st.session_state.get(clave):
+        out["omitido"] = "Aviso de inicio ya enviado en esta sesión (no se repite)."
+        return out
+
+    hora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    items = (estado or {}).get("items") or []
+    lineas_estado = []
+    for it in items:
+        icon = "OK" if it.get("activo") else "FAIL"
+        crit = "critico" if it.get("critico") else "opcional"
+        lineas_estado.append(f"[{icon}] {it.get('label')} ({crit}) — {it.get('detalle')}")
+    bloque = "\n".join(lineas_estado) or "(sin ítems)"
+    resumen = (estado or {}).get("resumen") or ""
+
+    if ok:
+        titulo_tg = "✅ Video Analyzer — sesión lista"
+        cuerpo_tg = (
+            f"{titulo_tg}\n"
+            f"Hora: {hora}\n"
+            f"Intrant v{APP_VERSION}\n"
+            f"{resumen}\n\n"
+            f"Canales verificados:\n{bloque}\n\n"
+            f"Todo correcto. Puedes iniciar el monitoreo."
+        )
+        asunto_mail = f"✅ Video Analyzer listo — Intrant {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+        cuerpo_mail = (
+            f"Video Analyzer (Intrant v{APP_VERSION}) verificó canales antes de iniciar sesión.\n\n"
+            f"Hora: {hora}\n"
+            f"Resultado: TODO CORRECTO\n"
+            f"{resumen}\n\n"
+            f"{bloque}\n\n"
+            f"— Aviso automático a autosemana@gmail.com"
+        )
+    else:
+        faltan = ", ".join((estado or {}).get("criticos_mal") or []) or "desconocido"
+        titulo_tg = "⚠️ Video Analyzer — canales incompletos"
+        cuerpo_tg = (
+            f"{titulo_tg}\n"
+            f"Hora: {hora}\n"
+            f"Faltan críticos: {faltan}\n"
+            f"{resumen}\n\n"
+            f"{bloque}\n\n"
+            f"No inicies hasta corregir."
+        )
+        asunto_mail = f"⚠️ Video Analyzer NO listo — Intrant {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+        cuerpo_mail = (
+            f"Video Analyzer (Intrant v{APP_VERSION}) encontró canales incompletos al iniciar.\n\n"
+            f"Hora: {hora}\n"
+            f"Faltan: {faltan}\n"
+            f"{resumen}\n\n"
+            f"{bloque}\n\n"
+            f"— Aviso automático a autosemana@gmail.com"
+        )
+
+    cliente = (estado or {}).get("cliente") or obtener_cliente_en_analisis() or {}
+
+    # Telegram
+    try:
+        tg = cliente.get("telegram") or {}
+        token = (tg.get("bot_token") or "").strip()
+        chat = (tg.get("chat_id") or "").strip()
+        if token and chat:
+            ok_tg, msg_tg = enviar_mensaje_telegram(cuerpo_tg, chat_id=chat, bot_token=token, parse_mode=None)
+            out["telegram"] = (ok_tg, msg_tg if ok_tg else msg_tg)
+            log_info(f"Aviso inicio Telegram: ok={ok_tg} {msg_tg}", func_name)
+        else:
+            out["telegram"] = (False, "Telegram sin token/chat_id")
+    except Exception as e:
+        out["telegram"] = (False, str(e))
+        log_warning(f"Aviso inicio Telegram error: {e}", func_name)
+
+    # Correo solo a autosemana
+    try:
+        out["email"] = _enviar_correo_autosemana_aviso(asunto_mail, cuerpo_mail, cliente)
+        log_info(f"Aviso inicio email autosemana: {out['email']}", func_name)
+    except Exception as e:
+        out["email"] = (False, str(e))
+        log_warning(f"Aviso inicio email error: {e}", func_name)
+
+    # Marcar enviado si al menos uno funcionó, o siempre para no spamear en fallos de red
+    st.session_state[clave] = True
+    return out
+
+
+def _enviar_correo_autosemana_aviso(asunto, cuerpo_texto, cliente=None):
+    """Envía correo Brevo únicamente a autosemana@gmail.com (aviso de sistema)."""
+    func_name = "_enviar_correo_autosemana_aviso"
+    destinatario = "autosemana@gmail.com"
+    cliente = cliente or obtener_cliente_en_analisis() or {}
+    brevo = cliente.get("brevo") or {}
+    api_key = (brevo.get("api_key") or "").strip()
+    sender_email = (brevo.get("sender_email") or "").strip()
+    sender_name = brevo.get("sender_name") or "Video Analyzer — Sistema"
+    if not api_key or not sender_email:
+        return False, "Brevo incompleto (api_key/sender)"
+    smtp_user, smtp_server, smtp_port = _brevo_smtp_login(brevo)
+    html = f"""<!DOCTYPE html><html><body style="font-family:Segoe UI,Arial,sans-serif;padding:20px;">
+<pre style="white-space:pre-wrap;background:#f8f9fa;padding:16px;border-radius:8px;">{html_module.escape(cuerpo_texto)}</pre>
+</body></html>"""
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = asunto
+    msg["From"] = f"{sender_name} <{sender_email}>"
+    msg["To"] = destinatario
+    msg.attach(MIMEText(cuerpo_texto, "plain", "utf-8"))
+    msg.attach(MIMEText(html, "html", "utf-8"))
+    with smtplib.SMTP(smtp_server, smtp_port) as server:
+        server.starttls()
+        server.login(smtp_user, api_key)
+        server.send_message(msg)
+    return True, f"Enviado a {destinatario}"
+
+
 def obtener_cliente_default():
-    """Compat: ya no devuelve EDESUR. En v5.5+ es Intrant."""
+    """Compat: ya no devuelve EDESUR. En v5.6+ es Intrant."""
     c = None
     try:
         if os.path.exists(CLIENTES_CONFIG):
@@ -993,9 +1542,12 @@ def obtener_cliente_default():
 
 
 def obtener_cliente_en_analisis():
-    """Cliente de monitoreo: siempre Intrant en v5.5."""
+    """Cliente de monitoreo: siempre Intrant en v5.6. Canales con credenciales quedan activos."""
     if MODO_SOLO_INTRANT:
-        return obtener_cliente_por_id(CLIENTE_ID_UNICO) or obtener_cliente_default()
+        c = obtener_cliente_por_id(CLIENTE_ID_UNICO) or obtener_cliente_default()
+        if c:
+            _forzar_canales_intrant_activos(c)
+        return c
     try:
         activos = [
             c for c in cargar_clientes()
@@ -1004,13 +1556,18 @@ def obtener_cliente_en_analisis():
     except Exception:
         activos = []
     if len(activos) == 1:
+        _forzar_canales_intrant_activos(activos[0])
         return activos[0]
     for c in activos:
         if (c.get('id') or '').lower() == 'intrant':
+            _forzar_canales_intrant_activos(c)
             return c
     if activos:
         return activos[0]
-    return obtener_cliente_por_id('intrant') or obtener_cliente_default()
+    c = obtener_cliente_por_id('intrant') or obtener_cliente_default()
+    if c:
+        _forzar_canales_intrant_activos(c)
+    return c
 
 
 def crear_cliente_nuevo(nombre, color='#4CAF50'):
@@ -1078,7 +1635,7 @@ def crear_cliente_nuevo(nombre, color='#4CAF50'):
 def agregar_cliente(cliente):
     """Agrega un nuevo cliente a la lista"""
     if MODO_SOLO_INTRANT:
-        return False, "v5.5 Intrant: no se pueden agregar otros clientes"
+        return False, "v5.6 Intrant: no se pueden agregar otros clientes"
     clientes = cargar_clientes()
     # Verificar que no exista un cliente con el mismo nombre
     for c in clientes:
@@ -1092,7 +1649,7 @@ def agregar_cliente(cliente):
 def actualizar_cliente(cliente_id, datos_actualizados):
     """Actualiza un cliente existente"""
     if MODO_SOLO_INTRANT and (cliente_id or '').strip().lower() != CLIENTE_ID_UNICO:
-        return False, "v5.5 Intrant: solo se puede editar Intrant"
+        return False, "v5.6 Intrant: solo se puede editar Intrant"
     clientes = cargar_clientes()
     for i, cliente in enumerate(clientes):
         if cliente.get('id') == cliente_id:
@@ -1109,9 +1666,9 @@ def actualizar_cliente(cliente_id, datos_actualizados):
 def eliminar_cliente(cliente_id):
     """Elimina un cliente de la lista"""
     if (cliente_id or '').strip().lower() == CLIENTE_ID_UNICO:
-        return False, "No se puede eliminar Intrant (cliente único v5.5)"
+        return False, "No se puede eliminar Intrant (cliente único v5.6)"
     if MODO_SOLO_INTRANT:
-        return False, "v5.5 Intrant: no hay otros clientes que eliminar"
+        return False, "v5.6 Intrant: no hay otros clientes que eliminar"
     clientes = cargar_clientes()
     clientes_filtrados = [c for c in clientes if c.get('id') != cliente_id]
     if len(clientes_filtrados) == len(clientes):
@@ -1121,7 +1678,7 @@ def eliminar_cliente(cliente_id):
     return False, "Error eliminando cliente"
 
 def obtener_clientes_activos():
-    """Retorna clientes activos. v5.5: solo Intrant (nunca recrea EDESUR)."""
+    """Retorna clientes activos. v5.6: solo Intrant (nunca recrea EDESUR)."""
     if MODO_SOLO_INTRANT:
         asegurar_modo_solo_intrant()
         clientes = cargar_clientes()
@@ -1260,6 +1817,8 @@ def obtener_cliente_por_termino(termino):
                             cliente_id = t.get('cliente_id', 'default')
                             c = obtener_cliente_por_id(cliente_id)
                             if c:
+                                if MODO_SOLO_INTRANT or (c.get('id') or '').strip().lower() == CLIENTE_ID_UNICO:
+                                    _forzar_canales_intrant_activos(c)
                                 return c
                             # Cliente borrado del JSON → Intrant en análisis, no Edesur
                             log_warning(
@@ -1280,6 +1839,8 @@ def obtener_cliente_por_termino(termino):
             lista = cliente.get('terminos') or []
             for lt in lista:
                 if ((lt if isinstance(lt, str) else str(lt)) or "").strip().lower() == term_norm:
+                    if MODO_SOLO_INTRANT or (cliente.get('id') or '').strip().lower() == CLIENTE_ID_UNICO:
+                        _forzar_canales_intrant_activos(cliente)
                     return cliente
     except Exception as e2:
         log_exception("obtener_cliente_por_termino_clientes_fallback", e2)
@@ -1538,7 +2099,7 @@ def enviar_brevo_cliente(cliente, termino_encontrado, resumen_completo, nombre_v
             cliente_nombre=cliente,
         )
         
-        # Texto plano como alternativa
+        # Texto plano: siempre listar Cloudinary y R2 (obligatorios en correo de coincidencia)
         _arch_plano_lines = archivo_broadcast_lineas_correo_plano(nombre_video)
         text_content = f"""
 Coincidencia detectada: {termino_encontrado}
@@ -1548,9 +2109,10 @@ Medio: {info_medio}
 
 {resumen_completo}
 
-{f"Video (Cloudinary): {video_url}" if video_url else ""}
-{f"Video (Bunny CDN): {video_url_bunny}" if video_url_bunny else ""}
-{f"Video (Cloudflare R2): {video_url_r2}" if video_url_r2 else ""}
+=== ENLACES DEL VIDEO (obligatorios) ===
+Video (Cloudinary): {video_url or 'No disponible'}
+Video (Cloudflare R2): {video_url_r2 or 'No disponible'}
+Video (Bunny CDN): {video_url_bunny or 'No disponible'}
 
 ---
 Sistema de Análisis de Videos - {cliente_nombre}
@@ -1559,12 +2121,31 @@ Sistema de Análisis de Videos - {cliente_nombre}
         msg.attach(MIMEText(text_content, 'plain', 'utf-8'))
         msg.attach(MIMEText(html_content, 'html', 'utf-8'))
         
-        # NO adjuntar videos grandes - solo usar URLs (igual que transmistral2.py)
+        # Validar enlaces obligatorios Cloudinary + R2
+        _c_ok = bool((video_url or "").strip())
+        _r_ok = bool((video_url_r2 or "").strip())
         if video_url or video_url_bunny or video_url_r2:
             log_info(
-                f"Usando URL(s) para video en correo: Cloudinary={video_url or '-'} | Bunny={video_url_bunny or '-'} | R2={video_url_r2 or '-'}",
+                f"URLs correo coincidencia: Cloudinary={video_url or '-'} | Bunny={video_url_bunny or '-'} | R2={video_url_r2 or '-'}",
                 func_name,
             )
+        if not (_c_ok and _r_ok):
+            faltan = []
+            if not _c_ok:
+                faltan.append("Cloudinary")
+            if not _r_ok:
+                faltan.append("R2")
+            log_warning(
+                f"Correo de coincidencia SIN enlace(s) obligatorio(s): {', '.join(faltan)}",
+                func_name,
+            )
+            try:
+                st.warning(
+                    f"⚠️ El correo de coincidencia va sin: **{' + '.join(faltan)}**. "
+                    "Debe incluir links de Cloudinary y R2."
+                )
+            except Exception:
+                pass
         
         # Enviar usando SMTP de Brevo (configuración igual a transmistral2.py)
         log_info(f"Conectando a SMTP: {smtp_server}:{smtp_port} con usuario {smtp_user}", func_name)
@@ -2556,6 +3137,10 @@ def notificar_brevo_tangencial_inmediato_si(cliente, item_tangencial, caller_fun
     if not item_tangencial:
         return
     try:
+        if MODO_SOLO_INTRANT or not cliente or (cliente.get('id') or '').strip().lower() in (CLIENTE_ID_UNICO, '', 'default'):
+            fresco = obtener_cliente_en_analisis()
+            if fresco:
+                cliente = fresco
         ok, msg = enviar_brevo_tangencial_inmediato(cliente, item_tangencial)
         if ok:
             log_info(f"📧 Tangencial inmediata Brevo OK ({cliente.get('nombre', '?')}): {msg}", caller_func_name)
@@ -2628,6 +3213,10 @@ def notificar_google_sheets_tangencial_inmediato_si(cliente, item_tangencial, ca
     if item_tangencial.get("sheets_enviado"):
         return
     try:
+        if MODO_SOLO_INTRANT or not cliente or (cliente.get('id') or '').strip().lower() in (CLIENTE_ID_UNICO, '', 'default'):
+            fresco = obtener_cliente_en_analisis()
+            if fresco:
+                cliente = fresco
         ok, msg = enviar_tangencial_una_a_google_sheets(cliente, item_tangencial)
         if ok:
             item_tangencial["sheets_enviado"] = True
@@ -3197,9 +3786,34 @@ def enviar_coincidencia_a_cliente(cliente, nombre_archivo, termino_encontrado, c
         return {"_dedupe_skip": (True, "Coincidencia ya notificada (dedupe).")}
     
     cliente_nombre = cliente.get('nombre', 'Desconocido')
+    # Siempre recargar Intrant fresco desde disco (evita sesión con enabled=false viejo)
+    if MODO_SOLO_INTRANT or (cliente.get('id') or '').strip().lower() in (CLIENTE_ID_UNICO, '', 'default'):
+        fresco = obtener_cliente_por_id(CLIENTE_ID_UNICO) or obtener_cliente_default()
+        if fresco:
+            cliente = fresco
+            cliente_nombre = cliente.get('nombre', cliente_nombre)
+        _forzar_canales_intrant_activos(cliente)
+        # Si aún faltan credenciales, intentar recuperar desde backup ahora mismo
+        if _intrant_canales_incompletos(cliente):
+            recuperado = _recuperar_intrant_canales_desde_backup(cliente)
+            if recuperado:
+                cliente = recuperado
+                guardar_clientes([cliente])
+                log_warning(
+                    "Intrant incompleto en envío; canales restaurados desde backup y persistidos",
+                    func_name,
+                )
     cliente_color = cliente.get('color', '#4CAF50')
     
     log_info(f"📤 Iniciando envío para cliente: {cliente_nombre} | Término: {termino_encontrado}", func_name)
+    log_info(
+        "Canales Intrant: "
+        + ", ".join(
+            f"{k}={'ON' if (cliente.get(k) or {}).get('enabled') else 'OFF'}"
+            for k in ('telegram', 'brevo', 'google_drive', 'google_sheets', 'cloudinary', 'r2', 'supabase')
+        ),
+        func_name,
+    )
     
     # Mostrar en UI a qué cliente se está enviando
     st.markdown(f"""
@@ -3207,6 +3821,24 @@ def enviar_coincidencia_a_cliente(cliente, nombre_archivo, termino_encontrado, c
         <h4 style="margin: 0; color: {cliente_color};">📤 Enviando a: {cliente_nombre}</h4>
     </div>
     """, unsafe_allow_html=True)
+    _canales_ui = []
+    for _k, _label in (
+        ('telegram', 'Telegram'),
+        ('brevo', 'Brevo'),
+        ('google_drive', 'Drive'),
+        ('google_sheets', 'Sheets'),
+        ('cloudinary', 'Cloudinary'),
+        ('r2', 'R2'),
+        ('supabase', 'Supabase'),
+    ):
+        _on = bool((cliente.get(_k) or {}).get('enabled'))
+        _canales_ui.append(f"{'✅' if _on else '❌'} {_label}")
+    st.caption("Canales: " + " · ".join(_canales_ui))
+    if any(not bool((cliente.get(k) or {}).get('enabled')) for k in ('telegram', 'brevo', 'google_drive', 'google_sheets', 'supabase')):
+        st.error(
+            "❌ Hay canales apagados pese a la config. Revisa `clientes_config.json` o reinicia la app. "
+            f"Estado: {' · '.join(_canales_ui)}"
+        )
     
     resultados = {}
     link_drive_video_coincidencia = ""
@@ -4644,6 +5276,12 @@ def subir_video_r2(video_path, termino="", timestamp=None, r2_cfg=None):
 def obtener_credenciales_google_drive():
     """Obtiene credenciales OAuth (Google Drive + Google Sheets) mediante refresh token."""
     try:
+        if not (GOOGLE_REFRESH_TOKEN and GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET):
+            log_warning(
+                "Google OAuth incompleto (.env). Drive/Sheets omitidos hasta restaurar backups/env_latest.env",
+                "obtener_credenciales_google_drive",
+            )
+            return None
         # Crear credenciales usando el refresh token
         creds = Credentials(
             None,  # No access token inicial
@@ -5189,7 +5827,7 @@ TRANSCRIPCIÓN COMPLETA:
 {transcripcion_completa}
 
 ===============================================
-GENERADO POR: Video Analyzer IA v5.5
+GENERADO POR: Video Analyzer IA v5.6
 ===============================================
 """
             
@@ -5930,7 +6568,7 @@ def generar_md_sesion_coincidencias(
         # ============================
         md.append(f"# 🎯 Reporte de Sesión - Coincidencias Detectadas")
         md.append(f"")
-        md.append(f"> **Video Analyzer IA v5.5** | Sesión: {fecha_legible}")
+        md.append(f"> **Video Analyzer IA v5.6** | Sesión: {fecha_legible}")
         md.append(f"")
         md.append(f"---")
         md.append(f"")
@@ -6115,7 +6753,7 @@ def generar_md_sesion_coincidencias(
         # ============================
         # PIE
         # ============================
-        md.append(f"_Reporte generado automáticamente por Video Analyzer IA v5.5 - {fecha_legible}_")
+        md.append(f"_Reporte generado automáticamente por Video Analyzer IA v5.6 - {fecha_legible}_")
         
         # === ESCRIBIR ARCHIVO ===
         contenido_final = "\n".join(md)
@@ -6328,6 +6966,7 @@ def generar_analisishoy_md(nombre_archivo, termino_encontrado, contexto_termino=
             seccion,
         )
         log_info(f"✅ Analisishoy MD actualizado: {ruta_md}", func_name)
+        _espejar_analisishoy_a_informes(ruta_md)
         return True, ruta_md
 
     except Exception as e:
@@ -6396,9 +7035,207 @@ def append_analisishoy_menciones_tangenciales(menciones_tangenciales_data):
             bloque,
         )
         log_info(f"✅ Analisishoy MD: menciones tangenciales añadidas ({len(menciones_tangenciales_data)}): {ruta_md}", func_name)
+        _espejar_analisishoy_a_informes(ruta_md)
         return True, ruta_md
     except Exception as e:
         log_exception(func_name, e, "Error añadiendo menciones tangenciales a Analisishoy MD")
+        return False, str(e)
+
+
+def _rutas_analisishoy_hoy():
+    """Rutas local (videos procesados) e informes del Analisishoy del día."""
+    fecha_hoy = datetime.now().strftime('%Y%m%d')
+    nombre_md = f"Analisishoy_{fecha_hoy}.md"
+    ruta_local = os.path.join(CARPETA_PROCESADOS, nombre_md)
+    ruta_informes = os.path.join(_INFORMES_GENERAL_DIR, nombre_md)
+    return nombre_md, ruta_local, ruta_informes
+
+
+def _encabezado_analisishoy(nombre_md):
+    return (
+        f"# 📊 Análisis de hoy — {datetime.now().strftime('%d/%m/%Y')}\n\n"
+        f"> Generado automáticamente por el sistema de monitoreo de medios (Intrant v{APP_VERSION}).\n"
+        f"> Archivo: `{nombre_md}`\n\n"
+    )
+
+
+def _espejar_analisishoy_a_informes(ruta_local):
+    """Copia Analisishoy a Desktop/informes (misma carpeta del informe general)."""
+    try:
+        if not ruta_local or not os.path.isfile(ruta_local):
+            return False, "origen inexistente"
+        os.makedirs(_INFORMES_GENERAL_DIR, exist_ok=True)
+        destino = os.path.join(_INFORMES_GENERAL_DIR, os.path.basename(ruta_local))
+        shutil.copy2(ruta_local, destino)
+        return True, destino
+    except Exception as e:
+        return False, str(e)
+
+
+def asegurar_analisishoy_obligatorio(
+    videos_revisados=None,
+    n_coincidencias=0,
+    n_tangenciales=0,
+    estadisticas_escaneo=None,
+):
+    """
+    OBLIGATORIO al cerrar cada ciclo: crea o actualiza Analisishoy_YYYYMMDD.md
+    aunque no haya coincidencias ni tangenciales (antes solo se escribía si había hallazgos).
+    También espeja el archivo a INFORMES_GENERAL_DIR.
+    """
+    func_name = "asegurar_analisishoy_obligatorio"
+    try:
+        nombre_md, ruta_md, _ruta_inf = _rutas_analisishoy_hoy()
+        os.makedirs(CARPETA_PROCESADOS, exist_ok=True)
+        hora_cierre = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        videos_revisados = list(videos_revisados or [])
+        n_vid = len(videos_revisados)
+        n_coinc = int(n_coincidencias or 0)
+        n_tang = int(n_tangenciales or 0)
+
+        if n_coinc > 0 or n_tang > 0:
+            resultado = f"{n_coinc} coincidencia(s), {n_tang} tangencial(es)"
+        else:
+            resultado = "sin hallazgos Intrant en este lote (videos revisados OK)"
+
+        lineas = [
+            "",
+            "---",
+            "",
+            f"## 📋 Cierre de ciclo — {hora_cierre}",
+            "",
+            f"- **Videos revisados en este ciclo:** {n_vid}",
+            f"- **Coincidencias fuertes:** {n_coinc}",
+            f"- **Menciones tangenciales:** {n_tang}",
+            f"- **Resultado:** {resultado}",
+        ]
+        if estadisticas_escaneo:
+            lineas.append(
+                f"- **Escaneo:** nuevos={estadisticas_escaneo.get('archivos_nuevos', 'N/A')}, "
+                f"total={estadisticas_escaneo.get('total_archivos', 'N/A')}"
+            )
+        lineas.append("")
+        if videos_revisados:
+            lineas.append("**Videos del lote:**")
+            lineas.append("")
+            for nom in videos_revisados[:80]:
+                lineas.append(f"- `{nom}`")
+            if n_vid > 80:
+                lineas.append(f"- … y {n_vid - 80} más")
+            lineas.append("")
+        else:
+            lineas.append("_No se registró lista de videos en este ciclo._")
+            lineas.append("")
+
+        bloque = "\n".join(lineas)
+        existe = os.path.exists(ruta_md) and os.path.getsize(ruta_md) > 0
+        if existe:
+            with open(ruta_md, 'a', encoding='utf-8') as f:
+                f.write(bloque)
+        else:
+            with open(ruta_md, 'w', encoding='utf-8') as f:
+                f.write(_encabezado_analisishoy(nombre_md) + bloque)
+
+        ok_esp, dest_o_err = _espejar_analisishoy_a_informes(ruta_md)
+        if ok_esp:
+            log_info(f"✅ Analisishoy obligatorio OK: {ruta_md} (espejo: {dest_o_err})", func_name)
+        else:
+            log_warning(f"Analisishoy escrito en {ruta_md} pero no se pudo espejar a informes: {dest_o_err}", func_name)
+
+        # Verificación dura: el archivo debe existir y tener contenido
+        if not os.path.isfile(ruta_md) or os.path.getsize(ruta_md) <= 0:
+            return False, f"Archivo no quedó en disco o está vacío: {ruta_md}"
+        return True, ruta_md
+    except Exception as e:
+        log_exception(func_name, e, "Error asegurando Analisishoy obligatorio")
+        return False, str(e)
+
+
+def enviar_alerta_correo_analisishoy_fallido(motivo, detalle=""):
+    """
+    Aviso Brevo (destinatarios Intrant) cuando Analisishoy del día no se pudo crear.
+    Returns: (ok: bool, mensaje: str)
+    """
+    func_name = "enviar_alerta_correo_analisishoy_fallido"
+    try:
+        cliente = obtener_cliente_por_id(CLIENTE_ID_UNICO) or {}
+        brevo_config = cliente.get('brevo', {}) or {}
+        if not brevo_config.get('enabled', False):
+            return False, "Brevo deshabilitado (Intrant)"
+
+        api_key = (brevo_config.get('api_key') or '').strip()
+        sender_email = (brevo_config.get('sender_email') or '').strip()
+        sender_name = brevo_config.get('sender_name') or 'Video Analyzer — Alerta sistema'
+        correos_todos = [c.strip() for c in (brevo_config.get('correos_destinatarios') or []) if (c or '').strip()]
+        # Alertas de sistema: preferir correos internos (no spam a destinatarios Intrant institucionales)
+        internos = [
+            c for c in correos_todos
+            if any(x in c.lower() for x in ('autosemana', 'fgjinfo', 'fgjmedios', 'info@'))
+        ]
+        correos_destinatarios = internos or correos_todos
+        smtp_user, smtp_server, smtp_port = _brevo_smtp_login(brevo_config)
+
+        if not api_key or not sender_email:
+            return False, "Brevo incompleto (api_key/sender_email)"
+        if not correos_destinatarios:
+            return False, "Sin correos_destinatarios en Intrant"
+
+        nombre_md, ruta_local, ruta_informes = _rutas_analisishoy_hoy()
+        hora = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        motivo_s = str(motivo or 'desconocido')[:800]
+        detalle_s = str(detalle or '').strip()[:2000]
+
+        asunto = f"⚠️ ALERTA: Analisishoy NO creado — {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+        text_content = "\n".join([
+            "ALERTA DEL SISTEMA — Video Analyzer (Intrant)",
+            "",
+            f"Hora: {hora}",
+            f"Archivo esperado: {nombre_md}",
+            f"Ruta local: {ruta_local}",
+            f"Ruta informes: {ruta_informes}",
+            "",
+            f"Motivo: {motivo_s}",
+            "",
+            f"Detalle: {detalle_s or '(sin detalle)'}",
+            "",
+            "Acción: revisa la UI de Streamlit, el disco y logs/app_*.log.",
+            "El informe Analisishoy es obligatorio al cerrar cada ciclo con videos revisados.",
+        ])
+        html_content = f"""<!DOCTYPE html><html><body style="font-family:Segoe UI,Arial,sans-serif;background:#f8f9fa;padding:24px;">
+<div style="max-width:640px;margin:0 auto;background:#fff;border-radius:12px;border:1px solid #dee2e6;overflow:hidden;">
+  <div style="background:#c0392b;color:#fff;padding:16px 20px;font-size:18px;font-weight:700;">⚠️ Analisishoy NO creado</div>
+  <div style="padding:20px;color:#212529;line-height:1.5;">
+    <p><strong>Hora:</strong> {html_module.escape(hora)}</p>
+    <p><strong>Archivo:</strong> <code>{html_module.escape(nombre_md)}</code></p>
+    <p><strong>Local:</strong> <code>{html_module.escape(ruta_local)}</code></p>
+    <p><strong>Informes:</strong> <code>{html_module.escape(ruta_informes)}</code></p>
+    <p><strong>Motivo:</strong> {html_module.escape(motivo_s)}</p>
+    <pre style="background:#f1f3f5;padding:12px;border-radius:8px;white-space:pre-wrap;">{html_module.escape(detalle_s or '(sin detalle)')}</pre>
+    <p style="color:#6c757d;font-size:13px;">Revisa Streamlit, espacio en disco y <code>logs/app_*.log</code>.</p>
+  </div>
+</div></body></html>"""
+
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = asunto
+        msg['From'] = f"{sender_name} <{sender_email}>"
+        msg['To'] = correos_destinatarios[0]
+        if len(correos_destinatarios) > 1:
+            msg['Bcc'] = ', '.join(correos_destinatarios[1:])
+        msg.attach(MIMEText(text_content, 'plain', 'utf-8'))
+        msg.attach(MIMEText(html_content, 'html', 'utf-8'))
+
+        log_info(
+            f"Enviando alerta Analisishoy fallido → {len(correos_destinatarios)} dest. Motivo: {motivo_s[:120]}",
+            func_name,
+        )
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_user, api_key)
+            server.send_message(msg)
+        log_info("Alerta Analisishoy fallido enviada por correo", func_name)
+        return True, f"Alerta enviada a {len(correos_destinatarios)} destinatario(s)"
+    except Exception as e:
+        log_exception(func_name, e, "Error enviando alerta Analisishoy")
         return False, str(e)
 
 
@@ -6481,6 +7318,41 @@ def crear_plantilla_email_html(
     
     v_r2_raw = (video_url_r2 or "").strip()
     vr2_esc = html_module.escape(v_r2_raw) if v_r2_raw else ""
+    v_cloud_raw = (video_url or "").strip()
+    v_cloud_esc = html_module.escape(v_cloud_raw) if v_cloud_raw else ""
+    v_bunny_raw = (video_url_bunny or "").strip()
+    v_bunny_esc = html_module.escape(v_bunny_raw) if v_bunny_raw else ""
+
+    # Sección OBLIGATORIA de enlaces Cloudinary + R2 (siempre visible en el correo)
+    def _fila_enlace(nombre, url_raw, url_esc, color):
+        if url_raw:
+            return f"""
+            <tr>
+              <td style="padding:10px 12px;border-bottom:1px solid #e9ecef;font-weight:600;color:#343a40;width:140px;">{nombre}</td>
+              <td style="padding:10px 12px;border-bottom:1px solid #e9ecef;word-break:break-all;">
+                <a href="{url_esc}" target="_blank" style="color:{color};font-weight:600;text-decoration:none;">🔗 Abrir enlace</a>
+                <div style="font-size:12px;color:#6c757d;margin-top:4px;">{url_esc}</div>
+              </td>
+            </tr>"""
+        return f"""
+            <tr>
+              <td style="padding:10px 12px;border-bottom:1px solid #e9ecef;font-weight:600;color:#343a40;width:140px;">{nombre}</td>
+              <td style="padding:10px 12px;border-bottom:1px solid #e9ecef;color:#c0392b;">❌ No disponible</td>
+            </tr>"""
+
+    enlaces_obligatorios_html = f"""
+        <div style="margin: 28px 0; padding: 22px; background: #fff; border-radius: 12px; border: 2px solid {primary_color};">
+            <h3 style="margin: 0 0 14px 0; color: {primary_color}; font-size: 18px;">🔗 Enlaces del video (obligatorios)</h3>
+            <p style="margin: 0 0 12px 0; color: #6c757d; font-size: 13px;">
+              El correo de coincidencia debe incluir Cloudinary y Cloudflare R2 cuando el clip se subió correctamente.
+            </p>
+            <table style="width:100%;border-collapse:collapse;font-size:14px;">
+              {_fila_enlace("Cloudinary", v_cloud_raw, v_cloud_esc, "#007bff")}
+              {_fila_enlace("Cloudflare R2", v_r2_raw, vr2_esc, "#e65100")}
+              {_fila_enlace("Bunny CDN", v_bunny_raw, v_bunny_esc, "#ee5a24") if (v_bunny_raw or True) else ""}
+            </table>
+        </div>
+        """
 
     # Botón de reproducir al inicio
     play_intro_section = ""
@@ -6583,6 +7455,8 @@ def crear_plantilla_email_html(
             <div style="padding: 30px;">
                 
                 {play_intro_section}
+                
+                {enlaces_obligatorios_html}
                 
                 {video_section}
                 
@@ -6960,7 +7834,7 @@ def generar_html_resumen_diario(coincidencias, cliente_nombre, corte_label, fech
         <!-- Footer -->
         <div style="background: #343a40; color: white; padding: 20px; border-radius: 0 0 16px 16px; text-align: center;">
             <p style="margin: 4px 0; opacity: 0.8; font-size: 13px;">
-                🤖 Resumen generado automáticamente por Video Analyzer IA v5.5
+                🤖 Resumen generado automáticamente por Video Analyzer IA v5.6
             </p>
             <p style="margin: 4px 0; opacity: 0.6; font-size: 12px;">
                 {datetime.now().strftime('%d/%m/%Y %H:%M:%S')} &middot; {cliente_nombre}
@@ -7722,7 +8596,7 @@ def enviar_clips_a_telegram(clips_generados, resumen, terminos_detectados, video
 📋 *RESUMEN EJECUTIVO:*
 {resumen}
 
-🌐 *Servidor:* Analizador de Videos IA v5.5
+🌐 *Servidor:* Analizador de Videos IA v5.6
 
 ⬇️ *Videos a continuación...*"""
         
@@ -7839,7 +8713,7 @@ def test_telegram_connection():
 
 ✅ Bot conectado correctamente
 ⏰ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-🤖 Analizador de Videos IA v5.5
+🤖 Analizador de Videos IA v5.6
 
 Este es un mensaje de prueba."""
     
@@ -7934,7 +8808,7 @@ def init_session_state():
         # === Loop continuo ===
         'loop_continuo': True,               # Loop activado por defecto
         'intervalo_loop': 60,                # Segundos entre ciclos cuando hay videos
-        'intervalo_loop_vacio': 120,         # Segundos entre ciclos cuando NO hay videos nuevos
+        'intervalo_loop_vacio': 360,         # Segundos entre ciclos cuando NO hay videos nuevos (6 min)
         'loop_ciclo_numero': 0,              # Contador de ciclos completados
         # === Contador de uso Mistral/Voxtral ===
         'mistral_total_audio_seconds': 0,       # Segundos de audio procesados
@@ -7952,7 +8826,27 @@ def init_session_state():
         if key not in st.session_state:
             st.session_state[key] = value
 
-# v5.5: purgar EDESUR/MINERD/Presidencia antes de la UI
+    # Migrar espera sin nuevos a 6 min (si quedó default 2 min o 10 min)
+    if st.session_state.get('intervalo_loop_vacio') in (120, 600):
+        st.session_state.intervalo_loop_vacio = 360
+
+    # Sincronizar términos Intrant canónicos (digesett, abinader, …)
+    try:
+        _canon_terms = [{'termino': n, 'cliente_id': CLIENTE_ID_UNICO} for n in TERMINOS_INTRANT_CANONICOS]
+        _cur = st.session_state.get('terminos_continuos') or []
+        _cur_names = []
+        for _t in _cur:
+            if isinstance(_t, dict):
+                _cur_names.append(normalizar_nombre_termino(_t.get('termino') or '').lower())
+            else:
+                _cur_names.append(normalizar_nombre_termino(str(_t)).lower())
+        _want = [n.lower() for n in TERMINOS_INTRANT_CANONICOS]
+        if _cur_names != _want:
+            st.session_state.terminos_continuos = _canon_terms
+    except Exception:
+        pass
+
+# v5.6: purgar EDESUR/MINERD/Presidencia antes de la UI
 try:
     asegurar_modo_solo_intrant()
 except Exception as _e_solo:
@@ -8214,9 +9108,9 @@ with col5:
     else:
         st.warning("📧 **Brevo** ⚠️\nNo configurado")
     
-st.title("🎬 Análisis Automático de Videos — v5.5 Intrant ✅")
+st.title("🎬 Análisis Automático de Videos — v5.6 Intrant ✅")
 st.info(
-    f"🧠 **v5.5 Intrant** | Solo cliente **Intrant** (sin EDESUR/MINERD/Presidencia). "
+    f"🧠 **v5.6 Intrant** | Solo cliente **Intrant** (sin EDESUR/MINERD/Presidencia). "
     f"Cadena: Kimi → GLM → Gemini/GPT-4o → DeepSeek. Preferido: **{obtener_etiqueta_motor_sesion()}**. "
     "Lun–vie: horarios de escaneo (sidebar). **06:00–09:00**, **21:00–24:00** y sáb/dom y CDN/TRA: todos."
 )
@@ -8752,6 +9646,32 @@ with st.sidebar:
     st.metric("Clips generados", st.session_state.clips_generados)
 
     st.markdown("---")
+    st.header("🔌 Canales Intrant")
+    _side_chk = st.session_state.get("checklist_canales_estado")
+    if not _side_chk:
+        try:
+            _side_chk = revisar_estado_canales_intrant(reparar=True)
+            st.session_state["checklist_canales_estado"] = _side_chk
+            st.session_state["checklist_canales_visto"] = True
+        except Exception:
+            _side_chk = None
+    if _side_chk:
+        if _side_chk.get("ok_criticos"):
+            st.success(_side_chk.get("resumen", "OK"))
+        else:
+            st.error(_side_chk.get("resumen", "Faltan canales"))
+        for _it in _side_chk.get("items", []):
+            if _it.get("id") in ("webhook", "analisishoy", "terminos", "env_google", "intrant"):
+                continue
+            _ic = "✅" if _it["activo"] else ("❌" if _it["critico"] else "⚪")
+            st.caption(f"{_ic} {_it['label']}")
+    if st.button("🔄 Verificar canales", key="sidebar_recheck_canales"):
+        st.session_state["checklist_canales_visto"] = False
+        st.session_state["aviso_inicio_ok_enviado"] = False
+        st.session_state["aviso_inicio_fail_enviado"] = False
+        st.rerun()
+
+    st.markdown("---")
     st.header("🏢 Análisis por entidad")
     st.caption("Apaga un cliente para **no buscar** sus términos en el análisis (se guarda en `clientes_config.json`).")
     for _sc in obtener_clientes_activos():
@@ -8901,11 +9821,11 @@ with st.sidebar:
             nuevo_intervalo_vacio = st.number_input(
                 "Espera sin nuevos (s)",
                 min_value=30, max_value=1800,
-                value=st.session_state.get('intervalo_loop_vacio', 120),
+                value=st.session_state.get('intervalo_loop_vacio', 360),
                 step=30,
-                help="Segundos de espera cuando no hay videos nuevos"
+                help="Segundos de espera cuando no hay videos nuevos (default 6 min)"
             )
-            if nuevo_intervalo_vacio != st.session_state.get('intervalo_loop_vacio', 120):
+            if nuevo_intervalo_vacio != st.session_state.get('intervalo_loop_vacio', 360):
                 st.session_state.intervalo_loop_vacio = nuevo_intervalo_vacio
         
         ciclos = st.session_state.get('loop_ciclo_numero', 0)
@@ -9407,6 +10327,30 @@ with st.sidebar:
         """)
 
 # === PANEL DE CONTROL PRINCIPAL ===
+# Checklist de canales ANTES de iniciar (una vez por sesión + siempre visible al tope del panel)
+if not st.session_state.get("checklist_canales_visto"):
+    mostrar_checklist_canales_inicio(forzar=True)
+else:
+    with st.expander(
+        f"✅ Checklist canales Intrant — {st.session_state.get('checklist_canales_estado', {}).get('resumen', 'ver detalle')}",
+        expanded=False,
+    ):
+        if st.button("🔄 Re-verificar canales ahora", key="btn_recheck_canales"):
+            st.session_state["aviso_inicio_ok_enviado"] = False
+            st.session_state["aviso_inicio_fail_enviado"] = False
+            st.session_state["checklist_canales_visto"] = False
+            st.rerun()
+        else:
+            _est = st.session_state.get("checklist_canales_estado") or revisar_estado_canales_intrant(reparar=False)
+            for _it in _est.get("items", []):
+                _ic = "✅" if _it["activo"] else ("❌" if _it["critico"] else "⚪")
+                st.markdown(f"{_ic} **{_it['label']}** — {_it['detalle']}")
+            _av = st.session_state.get("checklist_avisos_inicio") or {}
+            if _av.get("telegram"):
+                st.caption(f"📱 Telegram inicio: {_av['telegram']}")
+            if _av.get("email"):
+                st.caption(f"📧 autosemana: {_av['email']}")
+
 st.markdown("## 🎛️ Panel de Control Principal")
 
 col1, col2, col3, col4 = st.columns(4)
@@ -13282,7 +14226,7 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
         
         # Si el loop está activo, esperar y re-escanear
         if st.session_state.get('loop_continuo', True):
-            espera = st.session_state.get('intervalo_loop_vacio', 120)
+            espera = st.session_state.get('intervalo_loop_vacio', 360)
             st.info(f"🔄 **LOOP ACTIVO** - Re-escaneando en {espera}s buscando videos nuevos...")
             log_info(f"Loop activo, sin videos nuevos. Esperando {espera}s para re-escanear", func_name)
             
@@ -13369,6 +14313,7 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
     
     clips_generados_en_sesion = []
     videos_procesados_data = []  # Almacenar datos de todos los videos procesados
+    videos_revisados_ciclo = []  # Todos los videos analizados en el ciclo (con o sin hallazgo)
     menciones_tangenciales_data = []  # Solo para persistencia UI de rechazos tangenciales/relevancia
 
     # Contenedor para el progreso del video actual (se reemplaza en cada iteracion)
@@ -13666,7 +14611,7 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                         f.write(f"Fecha creación: {datetime.now().isoformat()}\n")
                         f.write(f"Archivo origen: {rel} ({tipo_archivo})\n")
                         f.write(f"Términos buscados: {', '.join(terminos_nombres)}\n")
-                        f.write(f"Generado por: Video Analyzer IA v5.5\n")
+                        f.write(f"Generado por: Video Analyzer IA v5.6\n")
             
                 # ========== GUARDAR TRANSCRIPCIÓN COMPLETA DEL VIDEO ==========
                 transcripcion_completa_path = os.path.join(archivo_main_dir, "TRANSCRIPCION_COMPLETA.txt")
@@ -13697,7 +14642,7 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                             f.write(f"- Total de palabras: {len(transcripcion_mistral.split())}\n")
                             f.write(f"- Total de caracteres: {len(transcripcion_mistral)}\n")
                             f.write(f"\n{'='*80}\n")
-                            f.write(f"✅ Generado automáticamente por Video Analyzer IA v5.5\n")
+                            f.write(f"✅ Generado automáticamente por Video Analyzer IA v5.6\n")
                     
                         log_info(f"✅ Transcripción completa guardada: {transcripcion_completa_path}", func_name)
                         if not mostrar_solo_relevantes:
@@ -13718,6 +14663,13 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                     'morrison': ['morison', 'morisón', 'morrisón'],
                     'milton morrison': ['milton morison', 'milton morisón', 'milton morrisón'],
                     'motoristas': ['motorista'],
+                    # Abinader (ASR: avinader / aminader)
+                    'abinader': ['avinader', 'aminader', 'a binader', 'abi nader'],
+                    # DIGESETT (ASR: zed / DGC / digest / digeset)
+                    'digesett': [
+                        'zed', 'dgc', 'digest', 'digeset', 'digesettt',
+                        'dige sett', 'dige set', 'di gesett',
+                    ],
                     'edesur': ['ede sur', 'ede-sur'],
                     'edenorte': ['ede norte', 'ede-norte'],
                     'edeeste': ['ede este', 'ede-este'],
@@ -13794,7 +14746,9 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                     # Intrant — siempre clip si aparecen en la transcripción
                     'intrant', 'intran',
                     'milton morrison', 'morrison',
-                    'digest', 'digeset', 'erredevial',
+                    'digesett', 'digest', 'digeset', 'zed', 'dgc',
+                    'abinader', 'avinader', 'aminader',
+                    'erredevial',
                 }
             
                 # ========== CONTROL DE DUPLICADOS ==========
@@ -13810,6 +14764,9 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                 
                     if not termino:
                         continue
+
+                    # Normalizar variantes ASR al canónico (avinader→abinader, zed/DGC→digesett)
+                    termino = normalizar_nombre_termino(termino)
                     
                     # PRIMERA VERIFICACIÓN: solo en la TRANSCRIPCIÓN (como siempre)
                     encontrado, termino_encontrado = buscar_termino_flexible(termino, text_lower)
@@ -14719,6 +15676,7 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                         st.info(f"📦 {tipo_archivo} almacenado para envío posterior: {rel}")
                     
                         # ========== REGISTRAR VIDEO PROCESADO (CON COINCIDENCIAS) ==========
+                        videos_revisados_ciclo.append(rel)
                         registrar_archivo_procesado(rel, coincidencias_items, resumen_archivo, tipo_archivo)
                         log_info(f"✅ Video registrado en procesados.log: {rel} ({len(coincidencias_items)} coincidencias)", func_name)
                         post_procesar_video_origen(
@@ -14737,6 +15695,7 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                         os.remove(audio_path)
             
                     # ========== REGISTRAR VIDEO PROCESADO (SIN COINCIDENCIAS) ==========
+                    videos_revisados_ciclo.append(rel)
                     registrar_archivo_procesado(rel, coincidencias_items, resumen_archivo, tipo_archivo)
                     log_info(f"✅ Video registrado en procesados.log: {rel} (sin coincidencias)", func_name)
                     post_procesar_video_origen(
@@ -14991,6 +15950,65 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
     except Exception as e_tang:
         st.warning(f"⚠️ AnalisisHoy MD (tangenciales): {e_tang}")
         log_warning(f"Error Analisishoy tangenciales: {e_tang}", func_name)
+
+    # === ANALISISHOY OBLIGATORIO (aunque 0 coincidencias / 0 tangenciales) ===
+    st.markdown("### 📄 AnalisisHoy (obligatorio)")
+    ok_ah = False
+    ruta_ah = ""
+    try:
+        n_coinc_ciclo = sum(len(v.get('coincidencias_items', []) or []) for v in (videos_procesados_data or []))
+        ok_ah, ruta_ah = asegurar_analisishoy_obligatorio(
+            videos_revisados=videos_revisados_ciclo,
+            n_coincidencias=n_coinc_ciclo,
+            n_tangenciales=len(menciones_tangenciales_data or []),
+            estadisticas_escaneo=estadisticas if 'estadisticas' in locals() else None,
+        )
+        # Doble chequeo en disco (por si el write “ok” pero el archivo desapareció/vació)
+        if ok_ah:
+            _nombre_chk, _ruta_chk, _ = _rutas_analisishoy_hoy()
+            if not os.path.isfile(_ruta_chk) or os.path.getsize(_ruta_chk) <= 0:
+                ok_ah = False
+                ruta_ah = f"Verificación post-escritura falló: {_ruta_chk}"
+        if ok_ah:
+            st.success(f"✅ **AnalisisHoy creado/actualizado:** `{os.path.basename(ruta_ah)}`")
+            st.caption(f"Local: `{ruta_ah}` · Espejo: `{_INFORMES_GENERAL_DIR}`")
+        else:
+            st.error(
+                f"❌ **AnalisisHoy NO se creó** (obligatorio). "
+                f"Detalle: `{ruta_ah}`"
+            )
+            st.warning(
+                "Se enviará un correo de alerta a los destinatarios Intrant (Brevo). "
+                "Revisa disco, permisos y `logs/app_*.log`."
+            )
+            log_warning(f"Analisishoy obligatorio falló: {ruta_ah}", func_name)
+            try:
+                ok_mail, msg_mail = enviar_alerta_correo_analisishoy_fallido(
+                    motivo="No se pudo crear/asegurar Analisishoy al cerrar el ciclo",
+                    detalle=str(ruta_ah),
+                )
+                if ok_mail:
+                    st.info(f"📧 Alerta por correo: {msg_mail}")
+                else:
+                    st.error(f"📧 No se pudo enviar la alerta por correo: {msg_mail}")
+            except Exception as e_mail_ah:
+                st.error(f"📧 Error enviando alerta Analisishoy: {e_mail_ah}")
+                log_warning(f"Error correo alerta Analisishoy: {e_mail_ah}", func_name)
+    except Exception as e_ah:
+        st.error(f"❌ **AnalisisHoy obligatorio falló:** {e_ah}")
+        log_warning(f"Error Analisishoy obligatorio: {e_ah}", func_name)
+        try:
+            ok_mail, msg_mail = enviar_alerta_correo_analisishoy_fallido(
+                motivo="Excepción al asegurar Analisishoy",
+                detalle=str(e_ah),
+            )
+            if ok_mail:
+                st.info(f"📧 Alerta por correo: {msg_mail}")
+            else:
+                st.error(f"📧 No se pudo enviar la alerta por correo: {msg_mail}")
+        except Exception as e_mail_ah2:
+            st.error(f"📧 Error enviando alerta Analisishoy: {e_mail_ah2}")
+            log_warning(f"Error correo alerta Analisishoy (exc): {e_mail_ah2}", func_name)
     
     # === CORREO BREVO: menciones tangenciales por entidad (fin de ciclo) ===
     st.markdown("### 📧 Correo Brevo — cierre de ciclo (tangenciales)")
@@ -15485,11 +16503,27 @@ with col1:
                 disabled=st.session_state.running,
                 type="primary",
                 help="Iniciar monitoreo automático continuo"):
+        # Antes de iniciar: re-verificar (sin reenviar avisos si ya se enviaron en esta sesión)
+        _chk = mostrar_checklist_canales_inicio(forzar=False)
         if not filtrar_terminos_por_analisis_clientes(st.session_state.terminos_continuos):
             st.error("❌ No hay términos para analizar: configura términos o activa al menos una entidad en el sidebar (🏢 Análisis por entidad).")
+        elif not _chk.get("ok_criticos"):
+            st.error(
+                "❌ **No se inicia:** hay canales críticos inactivos. "
+                f"Faltan: {', '.join(_chk.get('criticos_mal') or [])}. "
+                "Corrige la config y pulsa de nuevo."
+            )
+            log_warning(
+                f"Inicio bloqueado por checklist: {_chk.get('criticos_mal')}",
+                "INICIAR_BUSQUEDA",
+            )
         else:
             st.session_state.running = True
-            st.success(f"🚀 Búsqueda continua iniciada (cada {st.session_state.intervalo}s)")
+            st.success(
+                f"🚀 Búsqueda continua iniciada (cada {st.session_state.intervalo}s). "
+                f"Canales OK: {_chk.get('resumen')}"
+            )
+            log_info(f"Búsqueda continua iniciada — {_chk.get('resumen')}", "INICIAR_BUSQUEDA")
             st.rerun()
 
 with col2:
@@ -15595,7 +16629,7 @@ with tab4:
         st.markdown("### 🏢 Entidades y Rutas de Envío")
     with col_header2:
         if MODO_SOLO_INTRANT:
-            st.caption("v5.5: solo Intrant")
+            st.caption("v5.6: solo Intrant")
         elif st.button("➕ Nueva Entidad", type="primary", key="btn_abrir_nueva"):
             st.session_state['mostrar_form_nueva'] = not st.session_state.get('mostrar_form_nueva', False)
     

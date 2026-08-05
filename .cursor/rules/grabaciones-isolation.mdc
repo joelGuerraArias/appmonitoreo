@@ -38,3 +38,28 @@ Este workspace es **solo** `C:\Users\Joel Guerra\Desktop\grabaciones` (Video Ana
 
 - Confirmar que la ruta del archivo empieza por `...\grabaciones\`.
 - Script principal: `grabaciones\appMonitoreo.py`.
+
+## Blindaje anti-vaciado (obligatorio)
+
+Cursor ha vaciado `.env`, `appMonitoreo.py` y `clientes_config.json` (Undo Create Diff).
+
+1. **Antes de Streamlit:** `EJECUTAR_VIDEO_ANALYZER4.bat` ejecuta `proteger_integridad.py`.
+2. **Al cargar la app:** `proteger_integridad.proteger()` restaura y refresca backups.
+3. **Backups buenos:** `backups/clientes_config_intrant_golden.json` (no se pisa con basura), `env_latest.env`, `appMonitoreo_v55_backup.py`.
+4. **Nunca** editar/vaciar esos archivos desde el agente; si el editor los muestra vacíos → cerrar **sin guardar**.
+5. Solo `.env` queda en solo lectura tras blindaje OK. **`clientes_config.json` NO** (la app debe poder guardar canales activos).
+6. Un `clientes_config.json` con Intrant `enabled=false` / sin API key **ya no cuenta como sano** — se restaura desde golden. Log: `logs/integridad_causas.log`.
+
+## Por qué salía tanto “Omitido — *.enabled es falso”
+
+1. Cursor vacía/rompe el JSON → a veces queda un Intrant “válido” pero sin Brevo/Telegram.
+2. El blindaje viejo lo daba por OK y lo guardaba en `clientes_config_latest.json` (envenenaba el backup).
+3. Streamlit largo sin reiniciar seguía con esa config en memoria.
+4. Resultado: Telegram/Brevo/Drive/Sheets omitidos aunque “había coincidencia”.
+
+## `.env` y `appMonitoreo.py` — NO vaciar
+
+- **Nunca** escribir, truncar ni “undo diff” sobre `grabaciones/.env` ni dejar `appMonitoreo.py` en 0 bytes.
+- Si el `.env` o la app aparecen vacíos en el editor: **cerrar la pestaña sin guardar**.
+- Restaurar: ejecutar `python proteger_integridad.py` o el acceso **App Monitoreo**.
+- Causa observada (2026-08-03): Cursor `Undo Create Diff` → UI en blanco / Drive sin token.

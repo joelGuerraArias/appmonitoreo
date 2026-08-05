@@ -13,7 +13,7 @@
       "cliente_id": "intrant"
     },
     {
-      "termino": "digest",
+      "termino": "digesett",
       "cliente_id": "intrant"
     },
     {
@@ -21,7 +21,7 @@
       "cliente_id": "intrant"
     },
     {
-      "termino": "digeset",
+      "termino": "abinader",
       "cliente_id": "intrant"
     },
     {
@@ -29,6 +29,7 @@
       "cliente_id": "intrant"
     }
   ],
-  "fecha_actualizacion": "2026-08-01T00:49:50.318204",
-  "total_terminos": 7
+  "fecha_actualizacion": "2026-08-05T08:05:00",
+  "total_terminos": 7,
+  "modo": "solo_intrant"
 }

@@ -1,14 +1,11 @@
 import { NextResponse } from "next/server";
 import { patchSession } from "@/lib/session";
 import { readPrefs, writePrefs } from "@/lib/prefs";
-import { bootstrapStandalone } from "@/lib/bootstrap";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  // Fallback si instrumentation no corrió aún
-  bootstrapStandalone();
   const prefs = readPrefs();
   const session = patchSession({
     loop_continuo: prefs.loop_continuo,
@@ -29,7 +26,6 @@ export async function GET() {
 
 export async function PATCH(req: Request) {
   try {
-    bootstrapStandalone();
     const body = (await req.json()) as Record<string, unknown>;
     const allowed = [
       "loop_continuo",

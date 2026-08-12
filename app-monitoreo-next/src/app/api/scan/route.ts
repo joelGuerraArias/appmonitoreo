@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { listarClientesPublicos } from "@/lib/clientes";
 import { patchSession, getSession } from "@/lib/session";
-import { bootstrapStandalone } from "@/lib/bootstrap";
 import {
   isWorkerProcessAlive,
   readWorkerStatus,
@@ -36,7 +35,7 @@ function syncSessionFromWorker() {
 }
 
 export async function GET() {
-  bootstrapStandalone();
+  // Solo instrumentation inicia el worker; API no duplica.
   const session = syncSessionFromWorker();
   return NextResponse.json({
     ok: true,
@@ -48,7 +47,6 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    bootstrapStandalone();
     const body = (await req.json()) as {
       action?: string;
       mode?: "once" | "loop";

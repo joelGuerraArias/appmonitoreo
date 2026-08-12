@@ -2,6 +2,11 @@
 
 ## 📌 Cambios automáticos
 
+- [2026-08-12 08:25] FEAT: Video Analyzer v5.8
+  - Clips por idea (30–90s): cadena Kimi→DeepSeek→Gemini→GPT; UI muestra idea_central/texto_idea antes del corte; sin expansión ciega a 90s; mínimo de envío 30s. Arrancador con blindaje si `appMonitoreo.py` queda vacío. Next: bootstrap solo en instrumentation.
+
+---
+
 - [2026-08-05 09:17] FEAT: Video Analyzer v5.7
   - Misma base v5.6 + corrección ortográfica en transcripciones (avinader→abinader) y `abinader` fuera de la lista de búsqueda.
 

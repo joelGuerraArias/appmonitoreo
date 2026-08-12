@@ -467,11 +467,15 @@ except Exception as _e_ollama_init:
 MOTORES_IA_SESION = {
     "ollama_kimi": {"label": "Ollama Cloud — Kimi K2.7 (predeterminado)", "model": OLLAMA_MODEL_KIMI},
     "ollama_glm": {"label": "Ollama Cloud — GLM 5.2", "model": OLLAMA_MODEL_GLM},
-    "gemini": {"label": "Gemini 2.5 Flash-Lite → GPT-4o", "tipo": "gemini"},
-    "deepseek": {"label": "DeepSeek (último fallback)", "tipo": "deepseek"},
+    "deepseek": {"label": "DeepSeek", "tipo": "deepseek"},
+    "gemini": {"label": "Google Gemini", "tipo": "gemini"},
+    "gpt4": {"label": "GPT-4o", "tipo": "gpt4"},
 }
-CADENA_ANALISIS_CLIPS = ("ollama_kimi", "ollama_glm", "gemini", "deepseek")
+CADENA_ANALISIS_CLIPS = ("ollama_kimi", "deepseek", "gemini", "gpt4")
 CADENA_ANALISIS_TANGENCIALES = ("ollama_kimi", "ollama_glm", "deepseek")
+# Duración del clip por idea (obligatoria): corto pero usable
+CLIP_SEG_MIN_S = 30.0
+CLIP_SEG_MAX_S = 90.0
 
 # === CONFIGURACIÓN GOOGLE DRIVE (desde variables de entorno) ===
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', '')
@@ -538,8 +542,8 @@ CLOUDINARY_CONFIG = os.path.join(CARPETA_PROCESADOS, "cloudinary_config.json")  
 BUNNY_CONFIG = os.path.join(CARPETA_PROCESADOS, "bunny_config.json")  # Configuración de Bunny.net Storage
 CACHE_ESCANEO = os.path.join(CARPETA_PROCESADOS, "cache_escaneo.json")  # Caché de archivos escaneados
 CLIENTES_CONFIG = str(_DIR_SCRIPT / "clientes_config.json")
-# v5.7 Intrant: un solo cliente. Evita reaparición de EDESUR/MINERD/Presidencia y correos ajenos.
-APP_VERSION = "5.7"
+# v5.8 Intrant: un solo cliente. Evita reaparición de EDESUR/MINERD/Presidencia y correos ajenos.
+APP_VERSION = "5.8"
 MODO_SOLO_INTRANT = True
 CLIENTE_ID_UNICO = "intrant"
 TERMINOS_INTRANT_CANONICOS = (
@@ -1543,7 +1547,7 @@ def _enviar_correo_autosemana_aviso(asunto, cuerpo_texto, cliente=None):
 
 
 def obtener_cliente_default():
-    """Compat: ya no devuelve EDESUR. En v5.7+ es Intrant."""
+    """Compat: ya no devuelve EDESUR. En v5.8+ es Intrant."""
     c = None
     try:
         if os.path.exists(CLIENTES_CONFIG):
@@ -1558,7 +1562,7 @@ def obtener_cliente_default():
 
 
 def obtener_cliente_en_analisis():
-    """Cliente de monitoreo: siempre Intrant en v5.7. Canales con credenciales quedan activos."""
+    """Cliente de monitoreo: siempre Intrant en v5.8. Canales con credenciales quedan activos."""
     if MODO_SOLO_INTRANT:
         c = obtener_cliente_por_id(CLIENTE_ID_UNICO) or obtener_cliente_default()
         if c:
@@ -1651,7 +1655,7 @@ def crear_cliente_nuevo(nombre, color='#4CAF50'):
 def agregar_cliente(cliente):
     """Agrega un nuevo cliente a la lista"""
     if MODO_SOLO_INTRANT:
-        return False, "v5.7 Intrant: no se pueden agregar otros clientes"
+        return False, "v5.8 Intrant: no se pueden agregar otros clientes"
     clientes = cargar_clientes()
     # Verificar que no exista un cliente con el mismo nombre
     for c in clientes:
@@ -1665,7 +1669,7 @@ def agregar_cliente(cliente):
 def actualizar_cliente(cliente_id, datos_actualizados):
     """Actualiza un cliente existente"""
     if MODO_SOLO_INTRANT and (cliente_id or '').strip().lower() != CLIENTE_ID_UNICO:
-        return False, "v5.7 Intrant: solo se puede editar Intrant"
+        return False, "v5.8 Intrant: solo se puede editar Intrant"
     clientes = cargar_clientes()
     for i, cliente in enumerate(clientes):
         if cliente.get('id') == cliente_id:
@@ -1682,9 +1686,9 @@ def actualizar_cliente(cliente_id, datos_actualizados):
 def eliminar_cliente(cliente_id):
     """Elimina un cliente de la lista"""
     if (cliente_id or '').strip().lower() == CLIENTE_ID_UNICO:
-        return False, "No se puede eliminar Intrant (cliente único v5.7)"
+        return False, "No se puede eliminar Intrant (cliente único v5.8)"
     if MODO_SOLO_INTRANT:
-        return False, "v5.7 Intrant: no hay otros clientes que eliminar"
+        return False, "v5.8 Intrant: no hay otros clientes que eliminar"
     clientes = cargar_clientes()
     clientes_filtrados = [c for c in clientes if c.get('id') != cliente_id]
     if len(clientes_filtrados) == len(clientes):
@@ -1694,7 +1698,7 @@ def eliminar_cliente(cliente_id):
     return False, "Error eliminando cliente"
 
 def obtener_clientes_activos():
-    """Retorna clientes activos. v5.7: solo Intrant (nunca recrea EDESUR)."""
+    """Retorna clientes activos. v5.8: solo Intrant (nunca recrea EDESUR)."""
     if MODO_SOLO_INTRANT:
         asegurar_modo_solo_intrant()
         clientes = cargar_clientes()
@@ -2613,46 +2617,126 @@ def _limpiar_json_respuesta_modelo(texto):
 
 def _prompt_segmento_analisis(termino_encontrado, timestamp_coincidencia, duracion_maxima, texto):
     mm, ss = int(timestamp_coincidencia // 60), int(timestamp_coincidencia % 60)
-    user = f"""Eres editor de video. Encuentra el SEGMENTO donde "{termino_encontrado}" es el TEMA CENTRAL.
+    dmax = float(duracion_maxima or CLIP_SEG_MAX_S)
+    dmin = float(CLIP_SEG_MIN_S)
+    user = f"""Eres editor de video. Analiza la IDEA alrededor del término "{termino_encontrado}" (NO cortes a lo loco ni rellenes con comerciales/clima/temas ajenos).
 
 TIMESTAMP DETECCIÓN: {mm}:{ss:02d} ({timestamp_coincidencia:.1f}s)
-DURACIÓN REQUERIDA: ~{duracion_maxima}s
+DURACIÓN: entre {dmin:.0f}s y {dmax:.0f}s (obligatorio).
+- Si la idea es corta: saca SOLO la idea y completa hasta {dmin:.0f}s con contexto DEL MISMO TEMA.
+- Si la idea es media: deja esa duración (≤{dmax:.0f}s).
+- Si la idea es larga: corta a {dmax:.0f}s priorizando el núcleo alrededor del timestamp.
+- PROHIBIDO incluir anuncios, clima, economía ajena u otros bloques no relacionados.
 
-TRANSCRIPCIÓN:
+TRANSCRIPCIÓN CON TIMESTAMPS:
 {texto}
 
 Responde SOLO JSON:
-Si apruebas: {{"rechazar": false, "inicio_segundos": N, "fin_segundos": N, "duracion_segundos": N, "razon": "...", "idea_central": "..."}}
-Si rechazas (tangencial): {{"rechazar": true, "razon": "..."}}
+Si apruebas: {{"rechazar": false, "inicio_segundos": N, "fin_segundos": N, "duracion_segundos": N, "razon": "...", "idea_central": "1-2 oraciones sobre qué se dice del término", "texto_idea": "2-6 frases literales del tramo elegido"}}
+Si rechazas (tangencial / sin desarrollo): {{"rechazar": true, "razon": "..."}}
 """
     if termino_requiere_educacion_escolar_rd_exclusiva(termino_encontrado):
         user += "\n" + _suffix_prompt_educacion_escolar_rd()
     return user
 
 
-def _parse_resultado_segmento_json(raw, termino_encontrado, timestamp_coincidencia, duracion_maxima, etiqueta):
+def _texto_idea_desde_segmentos(segments, inicio, fin):
+    """Une el texto de segmentos que solapan [inicio, fin]."""
+    parts = []
+    try:
+        a, b = float(inicio), float(fin)
+    except (TypeError, ValueError):
+        return ""
+    for seg in segments or []:
+        try:
+            s = float(seg.get("start", 0) or 0)
+            e = float(seg.get("end", s) or s)
+        except (TypeError, ValueError):
+            continue
+        if e < a or s > b:
+            continue
+        t = (seg.get("text") or "").strip()
+        if t:
+            parts.append(t)
+    return " ".join(parts)
+
+
+def _clamp_segmento_por_idea(inicio, fin, hit, min_s=CLIP_SEG_MIN_S, max_s=CLIP_SEG_MAX_S):
+    """Ajusta ventana a [min_s, max_s] creciendo/recortando desde el hit (sin centrar basura lejana)."""
+    hit = float(hit)
+    inicio = max(0.0, float(inicio))
+    fin = max(inicio + 0.1, float(fin))
+    min_s = float(min_s)
+    max_s = float(max_s)
+
+    # Asegurar que el hit quede dentro o pegado a la ventana
+    if fin < hit:
+        fin = hit + 3.0
+    if inicio > hit:
+        inicio = max(0.0, hit - 3.0)
+
+    dur = fin - inicio
+    if dur > max_s:
+        # Recortar priorizando el núcleo alrededor del hit
+        before = min(hit - inicio, max_s * 0.45)
+        inicio = max(0.0, hit - before)
+        fin = inicio + max_s
+        if hit > fin:
+            fin = hit + 3.0
+            inicio = max(0.0, fin - max_s)
+        dur = fin - inicio
+
+    if dur < min_s:
+        # Completar hasta mínimo expandiendo desde el hit hacia afuera
+        need = min_s - dur
+        add_before = need / 2.0
+        add_after = need - add_before
+        nuevo_inicio = max(0.0, inicio - add_before)
+        faltante = (inicio - nuevo_inicio)
+        if faltante < add_before:
+            add_after += (add_before - faltante)
+        inicio = nuevo_inicio
+        fin = inicio + min_s
+        # Si el hit quedó fuera por estar al inicio del video, anclar en 0
+        if hit < inicio:
+            inicio = max(0.0, hit - min_s / 2.0)
+            fin = inicio + min_s
+        dur = fin - inicio
+
+    return inicio, fin, dur
+
+
+def _parse_resultado_segmento_json(raw, termino_encontrado, timestamp_coincidencia, duracion_maxima, etiqueta, segments=None):
     resultado = json.loads(_limpiar_json_respuesta_modelo(raw))
     if resultado.get("rechazar", False):
         razon = resultado.get("razon", "Mención tangencial")
         _guardar_razon_rechazo_segmento_ia(str(razon))
         st.warning(f"🚫 **{etiqueta}:** {razon}")
         return None
-    inicio = max(0.0, float(resultado.get("inicio_segundos", timestamp_coincidencia - 30)))
-    fin = float(resultado.get("fin_segundos", timestamp_coincidencia + 30))
-    if fin - inicio > duracion_maxima:
-        fin = inicio + duracion_maxima
-    if fin - inicio < 60:
-        centro = (inicio + fin) / 2
-        inicio = max(0.0, centro - 30)
-        fin = centro + 30
+    dmax = float(duracion_maxima or CLIP_SEG_MAX_S)
+    dmax = min(dmax, CLIP_SEG_MAX_S)
+    inicio = max(0.0, float(resultado.get("inicio_segundos", timestamp_coincidencia - 15)))
+    fin = float(resultado.get("fin_segundos", timestamp_coincidencia + 15))
+    inicio, fin, dur = _clamp_segmento_por_idea(inicio, fin, timestamp_coincidencia, CLIP_SEG_MIN_S, dmax)
+    texto_idea = (resultado.get("texto_idea") or "").strip()
+    if not texto_idea and segments is not None:
+        texto_idea = _texto_idea_desde_segmentos(segments, inicio, fin)
+    idea_central = (resultado.get("idea_central") or "").strip()
     out = {
         "inicio": inicio,
         "fin": fin,
         "razon": resultado.get("razon", f"Segmento {etiqueta}"),
-        "duracion": fin - inicio,
-        "idea_central": resultado.get("idea_central", ""),
+        "duracion": dur,
+        "idea_central": idea_central,
+        "texto_idea": texto_idea,
+        "motor": etiqueta,
     }
-    st.success(f"✅ **{etiqueta}:** Segmento {inicio:.1f}s–{fin:.1f}s ({out['duracion']:.1f}s)")
+    st.success(f"✅ **{etiqueta}:** Segmento {inicio:.1f}s–{fin:.1f}s ({dur:.1f}s)")
+    if idea_central:
+        st.info(f"💡 **Idea central:** {idea_central}")
+    if texto_idea:
+        st.markdown("**📝 Texto de la idea (tramo elegido):**")
+        st.write(texto_idea[:2000])
     return out
 
 
@@ -2667,9 +2751,10 @@ def determinar_segmento_inteligente_ollama(
         contexto.append(f"[{ti}] {seg['text'].strip()}")
     texto = "\n".join(contexto)
     user = _prompt_segmento_analisis(termino_encontrado, timestamp_coincidencia, duracion_maxima, texto)
-    raw = _ollama_chat(model_tag, "Responde solo JSON válido.", user, temperature=0.2, max_tokens=700)
+    raw = _ollama_chat(model_tag, "Responde solo JSON válido.", user, temperature=0.2, max_tokens=900)
     return _parse_resultado_segmento_json(
-        raw, termino_encontrado, timestamp_coincidencia, duracion_maxima, f"Ollama ({model_tag})"
+        raw, termino_encontrado, timestamp_coincidencia, duracion_maxima,
+        f"Ollama ({model_tag})", segments=transcripcion_con_timestamps,
     )
 
 
@@ -2685,9 +2770,10 @@ def determinar_segmento_inteligente_deepseek(
         contexto.append(f"[{ti}] {seg['text'].strip()}")
     texto = "\n".join(contexto)
     user = _prompt_segmento_analisis(termino_encontrado, timestamp_coincidencia, duracion_maxima, texto)
-    raw = _deepseek_chat("Responde solo JSON válido.", user, temperature=0.2, max_tokens=700)
+    raw = _deepseek_chat("Responde solo JSON válido.", user, temperature=0.2, max_tokens=900)
     return _parse_resultado_segmento_json(
-        raw, termino_encontrado, timestamp_coincidencia, duracion_maxima, f"DeepSeek ({DEEPSEEK_MODEL})"
+        raw, termino_encontrado, timestamp_coincidencia, duracion_maxima,
+        f"DeepSeek ({DEEPSEEK_MODEL})", segments=transcripcion_con_timestamps,
     )
 
 
@@ -2765,9 +2851,11 @@ Responde SOLO JSON:
 def determinar_segmento_inteligente_sesion(
     transcripcion_con_timestamps, termino_encontrado, timestamp_coincidencia, duracion_maxima=90
 ):
-    """Cadena: Kimi → GLM → Gemini/GPT-4o → DeepSeek."""
+    """Cadena fija de clips: Kimi → DeepSeek → Gemini → GPT-4o."""
     func_name = "determinar_segmento_inteligente_sesion"
-    cadena = _cadena_analisis_desde_preferido(CADENA_ANALISIS_CLIPS)
+    dmax = min(float(duracion_maxima or CLIP_SEG_MAX_S), CLIP_SEG_MAX_S)
+    # Cadena fija del plan (no recortar por preferencia de sesión: siempre Kimi primero)
+    cadena = list(CADENA_ANALISIS_CLIPS)
     last_err = None
     for motor in cadena:
         etiqueta = MOTORES_IA_SESION.get(motor, {}).get("label", motor)
@@ -2775,28 +2863,28 @@ def determinar_segmento_inteligente_sesion(
             if motor == "ollama_kimi":
                 return determinar_segmento_inteligente_ollama(
                     transcripcion_con_timestamps, termino_encontrado,
-                    timestamp_coincidencia, duracion_maxima, model_tag=OLLAMA_MODEL_KIMI,
-                )
-            if motor == "ollama_glm":
-                return determinar_segmento_inteligente_ollama(
-                    transcripcion_con_timestamps, termino_encontrado,
-                    timestamp_coincidencia, duracion_maxima, model_tag=OLLAMA_MODEL_GLM,
-                )
-            if motor == "gemini":
-                return determinar_segmento_inteligente_gemini(
-                    transcripcion_con_timestamps, termino_encontrado,
-                    timestamp_coincidencia, duracion_maxima,
+                    timestamp_coincidencia, dmax, model_tag=OLLAMA_MODEL_KIMI,
                 )
             if motor == "deepseek":
                 return determinar_segmento_inteligente_deepseek(
                     transcripcion_con_timestamps, termino_encontrado,
-                    timestamp_coincidencia, duracion_maxima,
+                    timestamp_coincidencia, dmax,
+                )
+            if motor == "gemini":
+                return determinar_segmento_inteligente_gemini(
+                    transcripcion_con_timestamps, termino_encontrado,
+                    timestamp_coincidencia, dmax,
+                )
+            if motor == "gpt4":
+                return determinar_segmento_inteligente_gpt4(
+                    transcripcion_con_timestamps, termino_encontrado,
+                    timestamp_coincidencia, dmax,
                 )
         except Exception as e:
             last_err = e
             log_warning(f"{motor} falló (segmento): {e} — siguiente en cadena", func_name)
             try:
-                st.warning(f"⚠️ {etiqueta} no respondió — siguiente (Kimi→GLM→Gemini/GPT-4o→DeepSeek).")
+                st.warning(f"⚠️ {etiqueta} no respondió — siguiente (Kimi→DeepSeek→Gemini→GPT).")
             except Exception:
                 pass
             continue
@@ -5843,7 +5931,7 @@ TRANSCRIPCIÓN COMPLETA:
 {transcripcion_completa}
 
 ===============================================
-GENERADO POR: Video Analyzer IA v5.7
+GENERADO POR: Video Analyzer IA v5.8
 ===============================================
 """
             
@@ -6584,7 +6672,7 @@ def generar_md_sesion_coincidencias(
         # ============================
         md.append(f"# 🎯 Reporte de Sesión - Coincidencias Detectadas")
         md.append(f"")
-        md.append(f"> **Video Analyzer IA v5.7** | Sesión: {fecha_legible}")
+        md.append(f"> **Video Analyzer IA v5.8** | Sesión: {fecha_legible}")
         md.append(f"")
         md.append(f"---")
         md.append(f"")
@@ -6769,7 +6857,7 @@ def generar_md_sesion_coincidencias(
         # ============================
         # PIE
         # ============================
-        md.append(f"_Reporte generado automáticamente por Video Analyzer IA v5.7 - {fecha_legible}_")
+        md.append(f"_Reporte generado automáticamente por Video Analyzer IA v5.8 - {fecha_legible}_")
         
         # === ESCRIBIR ARCHIVO ===
         contenido_final = "\n".join(md)
@@ -7850,7 +7938,7 @@ def generar_html_resumen_diario(coincidencias, cliente_nombre, corte_label, fech
         <!-- Footer -->
         <div style="background: #343a40; color: white; padding: 20px; border-radius: 0 0 16px 16px; text-align: center;">
             <p style="margin: 4px 0; opacity: 0.8; font-size: 13px;">
-                🤖 Resumen generado automáticamente por Video Analyzer IA v5.7
+                🤖 Resumen generado automáticamente por Video Analyzer IA v5.8
             </p>
             <p style="margin: 4px 0; opacity: 0.6; font-size: 12px;">
                 {datetime.now().strftime('%d/%m/%Y %H:%M:%S')} &middot; {cliente_nombre}
@@ -8612,7 +8700,7 @@ def enviar_clips_a_telegram(clips_generados, resumen, terminos_detectados, video
 📋 *RESUMEN EJECUTIVO:*
 {resumen}
 
-🌐 *Servidor:* Analizador de Videos IA v5.7
+🌐 *Servidor:* Analizador de Videos IA v5.8
 
 ⬇️ *Videos a continuación...*"""
         
@@ -8729,7 +8817,7 @@ def test_telegram_connection():
 
 ✅ Bot conectado correctamente
 ⏰ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-🤖 Analizador de Videos IA v5.7
+🤖 Analizador de Videos IA v5.8
 
 Este es un mensaje de prueba."""
     
@@ -8862,7 +8950,7 @@ def init_session_state():
     except Exception:
         pass
 
-# v5.7: purgar EDESUR/MINERD/Presidencia antes de la UI
+# v5.8: purgar EDESUR/MINERD/Presidencia antes de la UI
 try:
     asegurar_modo_solo_intrant()
 except Exception as _e_solo:
@@ -9124,9 +9212,9 @@ with col5:
     else:
         st.warning("📧 **Brevo** ⚠️\nNo configurado")
     
-st.title("🎬 Análisis Automático de Videos — v5.7 Intrant ✅")
+st.title("🎬 Análisis Automático de Videos — v5.8 Intrant ✅")
 st.info(
-    f"🧠 **v5.7 Intrant** | Solo cliente **Intrant** (sin EDESUR/MINERD/Presidencia). "
+    f"🧠 **v5.8 Intrant** | Solo cliente **Intrant** (sin EDESUR/MINERD/Presidencia). "
     f"Cadena: Kimi → GLM → Gemini/GPT-4o → DeepSeek. Preferido: **{obtener_etiqueta_motor_sesion()}**. "
     "Lun–vie: horarios de escaneo (sidebar). **06:00–09:00**, **21:00–24:00** y sáb/dom y CDN/TRA: todos."
 )
@@ -9891,22 +9979,34 @@ with st.sidebar:
     )
     
     # Configuración de clips con auto-guardado
-    st.markdown("**⏱️ Configuración de Duración de Clips:**")
-    st.info("💡 **Cómo funciona:** El clip incluirá [Buffer anterior] + momento de coincidencia + tiempo restante hasta [Duración total]")
+    st.markdown("**⏱️ Configuración de clips (segmento por idea):**")
+    st.info(
+        "💡 La cadena **Kimi → DeepSeek → Gemini → GPT** elige el tramo de la idea "
+        "(mín. 30s, máx. el tope). Ya no se rellena a 90s con basura."
+    )
     
-    nueva_duracion = st.slider("Duración total del clip (segundos)", 30, 180, st.session_state.get('duracion_clip', 90), 
-                               help="Duración total del clip generado. El usuario requiere estrictamente 90s para capturar ideas completas.")
-    
-    # Forzar que el valor mínimo sea 90 si no está configurado
-    if nueva_duracion < 90:
+    nueva_duracion = st.slider(
+        "Tope máximo del clip (segundos)",
+        30, 90,
+        min(90, max(30, int(st.session_state.get('duracion_clip', 90)))),
+        help="Tope superior. El segmento por idea dura entre 30s y este máximo (cadena Kimi→DeepSeek→Gemini→GPT).",
+    )
+    # Alinear con CLIP_SEG_MAX_S (90)
+    if nueva_duracion > 90:
         nueva_duracion = 90
-        st.warning("⚠️ Duración ajustada a 90 segundos (Mínimo requerido por ti)")
-    nuevo_buffer = st.slider("Buffer anterior (segundos)", 10, 90, st.session_state.get('buffer_anterior', 30),
-                            help="Tiempo antes de la coincidencia. Por defecto 30s antes")
+    if nueva_duracion < 30:
+        nueva_duracion = 30
+    nuevo_buffer = st.slider(
+        "Buffer anterior fallback (segundos)",
+        10, 45,
+        min(45, max(10, int(st.session_state.get('buffer_anterior', 15)))),
+        help="Solo si falla toda la cadena IA. Por defecto ~15s alrededor del hit (clip mínimo 30s).",
+    )
     
-    # Mostrar cálculo del buffer posterior
-    buffer_posterior = nueva_duracion - nuevo_buffer
-    st.caption(f"📊 **Resultado:** {nuevo_buffer//60}:{nuevo_buffer%60:02d} antes + {buffer_posterior//60}:{buffer_posterior%60:02d} después de la coincidencia")
+    st.caption(
+        f"📊 **Segmento por idea:** 30–{nueva_duracion}s · "
+        f"Fallback: ~{nuevo_buffer}s alrededor del hit (mín. 30s)"
+    )
 
     st.session_state.intro_clip_enabled = st.checkbox(
         "Intro logo + voz en clips de coincidencia",
@@ -12077,388 +12177,58 @@ def _tomar_y_limpiar_razon_rechazo_segmento_ia() -> str:
 
 
 def determinar_segmento_inteligente_gemini(transcripcion_con_timestamps, termino_encontrado, timestamp_coincidencia, duracion_maxima=90):
-    """
-    🌟 USA GEMINI 3 PRO PARA DETERMINAR EL SEGMENTO MÁS LÓGICO Y COHERENTE
-    
-    Gemini analiza la transcripción completa y determina cuál es el segmento más lógico donde
-    el término encontrado es el EJE CENTRAL de la conversación, no una mención tangencial.
-    
-    Args:
-        transcripcion_con_timestamps: Lista de segmentos con 'start', 'end', 'text'
-        termino_encontrado: El término que generó la coincidencia
-        timestamp_coincidencia: Timestamp donde se encontró el término
-        duracion_maxima: Duración máxima del clip en segundos (default: 60)
-    
-    Returns:
-        dict: {'inicio': float, 'fin': float, 'razon': str, 'duracion': float, 'idea_central': str}
-        None: Si el término solo se menciona tangencialmente (rechazado)
-    """
+    """Google Gemini: segmento por idea (prompt/parser compartidos). Falla → siguiente en cadena."""
     func_name = "determinar_segmento_inteligente_gemini"
     _guardar_razon_rechazo_segmento_ia("")
-    
-    # Verificar si Gemini está configurado
     if not gemini_client:
-        log_warning("⚠️ Gemini no configurado, usando fallback GPT-4o", func_name)
-        return determinar_segmento_inteligente_gpt4(
-            transcripcion_con_timestamps, termino_encontrado, 
-            timestamp_coincidencia, duracion_maxima
-        )
-    
-    try:
-        log_info(f"🌟 Iniciando análisis GEMINI 3 PRO para segmento inteligente del término '{termino_encontrado}'", func_name)
-        
-        # Construir contexto de transcripción con timestamps
-        contexto_transcripcion = []
-        for seg in transcripcion_con_timestamps:
-            tiempo_inicio = f"{int(seg['start']//60)}:{int(seg['start']%60):02d}"
-            contexto_transcripcion.append(f"[{tiempo_inicio}] {seg['text'].strip()}")
-        
-        texto_completo_timestamps = "\n".join(contexto_transcripcion)
-        
-        # Calcular timestamp en formato legible
-        minuto_coincidencia = int(timestamp_coincidencia // 60)
-        segundo_coincidencia = int(timestamp_coincidencia % 60)
-        
-        # Prompt optimizado para Gemini - ENFOCADO EN IDEAS CENTRADAS EN LA COINCIDENCIA
-        prompt = f"""Eres un experto editor de video y analista de contenido. Tu tarea es encontrar el SEGMENTO EXACTO donde "{termino_encontrado}" sea el TEMA CENTRAL de la conversación.
-
-🎯 TÉRMINO A ANALIZAR: "{termino_encontrado}"
-⏰ TIMESTAMP DE DETECCIÓN: {minuto_coincidencia}:{segundo_coincidencia:02d} ({timestamp_coincidencia:.1f} segundos)
-
-📝 TRANSCRIPCIÓN COMPLETA CON TIMESTAMPS:
-{texto_completo_timestamps}
-
-═══════════════════════════════════════════════════════════════════
-📋 TU MISIÓN CRÍTICA:
-═══════════════════════════════════════════════════════════════════
-
-1️⃣ IDENTIFICAR si "{termino_encontrado}" es el EJE CENTRAL del segmento:
-   ✅ APROBADO: La conversación GIRA EN TORNO a "{termino_encontrado}"
-   ✅ APROBADO: Hay información CONCRETA y DESARROLLADA sobre "{termino_encontrado}"
-   ✅ APROBADO: El término es el PROTAGONISTA, no un actor secundario
-   
-   ❌ RECHAZAR: Solo se menciona de pasada o en una lista
-   ❌ RECHAZAR: El tema principal es OTRO y "{termino_encontrado}" es tangencial
-   ❌ RECHAZAR: No hay desarrollo de ideas sobre "{termino_encontrado}"
-
-2️⃣ Si APRUEBAS, determinar el SEGMENTO ÓPTIMO que:
-   - Capture la IDEA COMPLETA relacionada con "{termino_encontrado}"
-   - Tenga INICIO y FIN naturales (no cortes abruptos)
-   - Duración REQUERIDA: EXACTAMENTE {duracion_maxima} segundos (obligatorio para no cortar la idea)
-   - Sea COHERENTE y COMPRENSIBLE por sí solo
-
-3️⃣ EXTRAER LA IDEA CENTRAL:
-   - ¿Qué se dice ESPECÍFICAMENTE sobre "{termino_encontrado}"?
-   - Resume en 1-2 oraciones la información CONCRETA
-   - NO resumas toda la transcripción, solo lo relacionado con el término
-
-═══════════════════════════════════════════════════════════════════
-📤 FORMATO DE RESPUESTA (JSON estricto, sin markdown):
-═══════════════════════════════════════════════════════════════════
-
-Si el término ES el tema central (APROBAR):
-{{
-  "rechazar": false,
-  "inicio_segundos": <número>,
-  "fin_segundos": <número>,
-  "duracion_segundos": <número>,
-  "razon": "<por qué este segmento captura la idea sobre {termino_encontrado}>",
-  "idea_central": "<qué se dice CONCRETAMENTE sobre {termino_encontrado} - máximo 2 oraciones>"
-}}
-
-Si el término NO es el tema central (RECHAZAR):
-{{
-  "rechazar": true,
-  "razon": "<por qué {termino_encontrado} solo es una mención tangencial>"
-}}
-
-⚠️ IMPORTANTE:
-- Sé ESTRICTO: Si hay duda, RECHAZA
-- La "idea_central" debe responder: "¿Qué dice este segmento SOBRE {termino_encontrado}?"
-- NO incluyas información que no esté directamente relacionada con el término
-{f'{_suffix_prompt_educacion_escolar_rd()}IMPORTANTE: Aplica la regla «EDUCACIÓN ESCOLAR DOMINICANA» antes de decidir rechazar o aprobar.' if termino_requiere_educacion_escolar_rd_exclusiva(termino_encontrado) else ''}
-
-RESPONDE SOLO CON EL JSON:"""
-
-        # Llamar a Gemini (modelo barato configurable vía GEMINI_MODEL)
-        log_info(f"📡 Enviando solicitud a Gemini ({GEMINI_MODEL}) para análisis de segmento...", func_name)
-        
-        response = gemini_client.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=prompt,
-            config={
-                "temperature": 0.2,  # Bajo para respuestas más consistentes
-                "max_output_tokens": 600
-            }
-        )
-        
-        respuesta_gemini = response.text.strip()
-        log_debug(f"Respuesta Gemini: {respuesta_gemini}", func_name)
-        
-        # Limpiar respuesta (remover markdown si existe)
-        respuesta_limpia = respuesta_gemini.replace("```json", "").replace("```", "").strip()
-        
-        # Parsear JSON
-        resultado = json.loads(respuesta_limpia)
-        
-        # 🚫 VERIFICAR SI GEMINI RECHAZÓ EL SEGMENTO
-        if resultado.get('rechazar', False):
-            razon_rechazo = resultado.get('razon', 'Mención tangencial sin desarrollo')
-            _guardar_razon_rechazo_segmento_ia(str(razon_rechazo))
-            log_warning(f"🚫 GEMINI RECHAZÓ el segmento: {razon_rechazo}", func_name)
-            st.warning(f"🚫 **Gemini:** {razon_rechazo}")
-            return None  # Indica que se debe rechazar el clip
-        
-        # Validar y ajustar resultados
-        _guardar_razon_rechazo_segmento_ia("")
-        
-        inicio = float(resultado.get('inicio_segundos', timestamp_coincidencia - 30))
-        fin = float(resultado.get('fin_segundos', timestamp_coincidencia + 30))
-        razon = resultado.get('razon', 'Segmento determinado por Gemini')
-        idea_central = resultado.get('idea_central', '')
-        
-        # Validaciones de seguridad
-        inicio = max(0, inicio)  # No puede ser negativo
-        duracion_calculada = fin - inicio
-        
-        # Si excede duración máxima, ajustar
-        if duracion_calculada > duracion_maxima:
-            log_warning(f"⚠️ Segmento Gemini ({duracion_calculada:.1f}s) excede máximo ({duracion_maxima}s), ajustando...", func_name)
-            fin = inicio + duracion_maxima
-            duracion_calculada = duracion_maxima
-            razon += " (ajustado a duración máxima)"
-        
-        # Si es muy corto (< 60s), expandir a 1 minuto mínimo (±30s del centro)
-        if duracion_calculada < 60:
-            log_warning(f"⚠️ Segmento Gemini corto ({duracion_calculada:.1f}s), expandiendo a 60s...", func_name)
-            centro = (inicio + fin) / 2
-            inicio = max(0, centro - 30)
-            fin = centro + 30
-            duracion_calculada = fin - inicio
-            razon += " (expandido a 1 minuto estándar)"
-        
-        resultado_final = {
-            'inicio': inicio,
-            'fin': fin,
-            'razon': razon,
-            'duracion': duracion_calculada,
-            'idea_central': idea_central  # Nueva: idea centrada en la coincidencia
-        }
-        
-        log_info(f"✅ Gemini determinó segmento: {inicio:.1f}s - {fin:.1f}s ({duracion_calculada:.1f}s)", func_name)
-        log_info(f"📝 Razón: {razon}", func_name)
-        log_info(f"💡 Idea central: {idea_central[:100]}...", func_name)
-        
-        # Mostrar en UI
-        st.success(f"🌟 **Gemini ({GEMINI_MODEL}):** Segmento inteligente: {inicio:.1f}s - {fin:.1f}s ({duracion_calculada:.1f}s)")
-        st.info(f"💡 **Razón:** {razon}")
-        if idea_central:
-            st.info(f"🎯 **Idea central sobre '{termino_encontrado}':** {idea_central}")
-        
-        return resultado_final
-        
-    except json.JSONDecodeError as e:
-        log_warning(f"⚠️ Error parseando JSON de Gemini: {e}. Intentando fallback GPT-4o", func_name)
-        # Fallback a GPT-4o
-        return determinar_segmento_inteligente_gpt4(
-            transcripcion_con_timestamps, termino_encontrado,
-            timestamp_coincidencia, duracion_maxima
-        )
-    
-    except Exception as e:
-        log_exception(func_name, e, f"Término: {termino_encontrado}, Timestamp: {timestamp_coincidencia}")
-        st.warning(f"⚠️ Error en análisis Gemini, usando fallback GPT-4o: {str(e)}")
-        
-        # Fallback a GPT-4o
-        return determinar_segmento_inteligente_gpt4(
-            transcripcion_con_timestamps, termino_encontrado,
-            timestamp_coincidencia, duracion_maxima
-        )
+        raise RuntimeError("Gemini no configurado")
+    contexto = []
+    for seg in transcripcion_con_timestamps or []:
+        ti = f"{int(seg['start']//60)}:{int(seg['start']%60):02d}"
+        contexto.append(f"[{ti}] {seg['text'].strip()}")
+    texto = "\n".join(contexto)
+    user = _prompt_segmento_analisis(termino_encontrado, timestamp_coincidencia, duracion_maxima, texto)
+    log_info(f"🌟 Gemini segmento idea '{termino_encontrado}' @ {timestamp_coincidencia:.1f}s", func_name)
+    response = gemini_client.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=user,
+        config={"temperature": 0.2, "max_output_tokens": 900},
+    )
+    raw = (response.text or "").strip()
+    return _parse_resultado_segmento_json(
+        raw, termino_encontrado, timestamp_coincidencia, duracion_maxima,
+        f"Gemini ({GEMINI_MODEL})", segments=transcripcion_con_timestamps,
+    )
 
 
 def determinar_segmento_inteligente_gpt4(transcripcion_con_timestamps, termino_encontrado, timestamp_coincidencia, duracion_maxima=90):
-    """
-    🤖 USA GPT-4o PARA DETERMINAR EL SEGMENTO MÁS LÓGICO Y COHERENTE
-    
-    En lugar de recortar mecánicamente X segundos antes/después, GPT-4o analiza
-    la transcripción completa y determina cuál es el segmento más lógico que:
-    - Contiene la idea completa relacionada con la coincidencia
-    - Tiene coherencia narrativa (inicio y fin naturales)
-    - Duración recomendada de 90 segundos de duración
-    - Captura el contexto relevante sin cortes abruptos
-    
-    Args:
-        transcripcion_con_timestamps: Lista de segmentos con 'start', 'end', 'text'
-        termino_encontrado: El término que generó la coincidencia
-        timestamp_coincidencia: Timestamp donde se encontró el término
-        duracion_maxima: Duración máxima del clip en segundos (default: 60)
-    
-    Returns:
-        dict: {'inicio': float, 'fin': float, 'razon': str, 'duracion': float}
-    """
+    """GPT-4o: segmento por idea (prompt/parser compartidos)."""
     func_name = "determinar_segmento_inteligente_gpt4"
-    
-    try:
-        _guardar_razon_rechazo_segmento_ia("")
-        log_info(f"🤖 Iniciando análisis GPT-4o para segmento inteligente del término '{termino_encontrado}'", func_name)
-        
-        # Construir contexto de transcripción con timestamps
-        contexto_transcripcion = []
-        for seg in transcripcion_con_timestamps:
-            tiempo_inicio = f"{int(seg['start']//60)}:{int(seg['start']%60):02d}"
-            contexto_transcripcion.append(f"[{tiempo_inicio}] {seg['text'].strip()}")
-        
-        texto_completo_timestamps = "\n".join(contexto_transcripcion)
-        
-        # Calcular timestamp en formato legible
-        minuto_coincidencia = int(timestamp_coincidencia // 60)
-        segundo_coincidencia = int(timestamp_coincidencia % 60)
-        
-        # Prompt para GPT-4o
-        prompt = f"""Eres un experto editor de video. Analiza esta transcripción con timestamps y determina el SEGMENTO donde "{termino_encontrado}" sea el TEMA CENTRAL.
+    _guardar_razon_rechazo_segmento_ia("")
+    if not openai_client:
+        raise RuntimeError("OpenAI/GPT no configurado")
+    contexto = []
+    for seg in transcripcion_con_timestamps or []:
+        ti = f"{int(seg['start']//60)}:{int(seg['start']%60):02d}"
+        contexto.append(f"[{ti}] {seg['text'].strip()}")
+    texto = "\n".join(contexto)
+    user = _prompt_segmento_analisis(termino_encontrado, timestamp_coincidencia, duracion_maxima, texto)
+    log_info(f"🤖 GPT-4o segmento idea '{termino_encontrado}' @ {timestamp_coincidencia:.1f}s", func_name)
+    resp = openai_client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": "Responde solo JSON válido."},
+            {"role": "user", "content": user},
+        ],
+        temperature=0.2,
+        max_tokens=900,
+    )
+    raw = (resp.choices[0].message.content or "").strip()
+    return _parse_resultado_segmento_json(
+        raw, termino_encontrado, timestamp_coincidencia, duracion_maxima,
+        "GPT-4o", segments=transcripcion_con_timestamps,
+    )
 
-🎯 TÉRMINO ENCONTRADO: "{termino_encontrado}"
-⏰ TIMESTAMP DE COINCIDENCIA: {minuto_coincidencia}:{segundo_coincidencia:02d} ({timestamp_coincidencia:.1f} segundos)
-
-📝 TRANSCRIPCIÓN COMPLETA CON TIMESTAMPS:
-{texto_completo_timestamps}
-
-📋 TU TAREA:
-Encuentra el segmento donde "{termino_encontrado}" sea el TEMA PRINCIPAL de la conversación, que cumpla:
-
-🎯 CRITERIO PRINCIPAL (MÁS IMPORTANTE):
-- El término "{termino_encontrado}" debe ser el EJE CENTRAL del segmento
-- La conversación debe GIRAR ALREDEDOR de "{termino_encontrado}"
-- NO aceptes menciones de pasada o tangenciales
-- La idea completa debe DESARROLLAR el tema de "{termino_encontrado}"
-
-✅ OTROS REQUISITOS:
-1. Tenga un INICIO y FIN NATURAL (no cortes abruptos)
-2. Capture el CONTEXTO RELEVANTE que desarrolla el tema
-3. Duración REQUERIDA: EXACTAMENTE {duracion_maxima} segundos (obligatorio para capturar la idea completa)
-4. Sea COHERENTE y COMPRENSIBLE por sí solo
-
-⚠️ IMPORTANTE:
-- Si "{termino_encontrado}" solo se menciona de pasada (sin desarrollar el tema), RESPONDE: {{"rechazar": true, "razon": "Mención tangencial sin desarrollo"}}
-- Identifica dónde EMPIEZA el desarrollo del tema (puede ser varios segundos antes del término)
-- Identifica dónde TERMINA el desarrollo completo de la idea
-- Busca pausas naturales, cambios de tema, o conclusiones de frases
-- Si la idea completa excede {duracion_maxima}s, prioriza el núcleo más importante
-{f'{_suffix_prompt_educacion_escolar_rd()}IMPORTANTE: Aplica la regla «EDUCACIÓN ESCOLAR DOMINICANA» antes de decidir rechazar o aprobar.' if termino_requiere_educacion_escolar_rd_exclusiva(termino_encontrado) else ''}
-
-RESPONDE EN FORMATO JSON (sin markdown, sin comentarios):
-{{
-  "rechazar": false,
-  "inicio_segundos": <timestamp de inicio en segundos como número>,
-  "fin_segundos": <timestamp de fin en segundos como número>,
-  "razon": "<breve explicación de por qué elegiste este segmento (1-2 líneas)>",
-  "duracion_segundos": <duración total del segmento como número>
-}}
-
-O si la mención es tangencial/sin desarrollo:
-{{
-  "rechazar": true,
-  "razon": "<explicación de por qué es solo mención tangencial>"
-}}"""
-
-        # Llamar a GPT-4o
-        log_info("📡 Enviando solicitud a GPT-4o para análisis de segmento...", func_name)
-        
-        # Usar API key desde variable de entorno
-        openai.api_key = os.getenv('OPENAI_API_KEY', '') or os.getenv('OPENAI_API_KEY_BACKUP', '')
-        
-        response = openai.chat.completions.create(
-            model="gpt-4o",  # Modelo más avanzado de OpenAI
-            messages=[
-                {"role": "system", "content": "Eres un experto editor de video que analiza transcripciones para determinar los mejores segmentos de corte."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.3,  # Bajo para respuestas más consistentes
-            max_tokens=1000
-        )
-        
-        respuesta_gpt = response.choices[0].message.content.strip()
-        log_debug(f"Respuesta GPT-4o: {respuesta_gpt}", func_name)
-        
-        # Limpiar respuesta (remover markdown si existe)
-        respuesta_limpia = respuesta_gpt.replace("```json", "").replace("```", "").strip()
-        
-        # Parsear JSON
-        resultado = json.loads(respuesta_limpia)
-        
-        # 🚫 VERIFICAR SI GPT-4o RECHAZÓ EL SEGMENTO
-        if resultado.get('rechazar', False):
-            razon_rechazo = resultado.get('razon', 'Mención tangencial sin desarrollo')
-            _guardar_razon_rechazo_segmento_ia(str(razon_rechazo))
-            log_warning(f"🚫 GPT-4o RECHAZÓ el segmento: {razon_rechazo}", func_name)
-            st.warning(f"🚫 **GPT-4o:** {razon_rechazo}")
-            # Retornar None para indicar que se debe rechazar el clip
-            return None
-        
-        # Validar y ajustar resultados
-        _guardar_razon_rechazo_segmento_ia("")
-        inicio = float(resultado.get('inicio_segundos', timestamp_coincidencia - 30))
-        fin = float(resultado.get('fin_segundos', timestamp_coincidencia + 30))
-        razon = resultado.get('razon', 'Segmento determinado por GPT-4o')
-        
-        # Validaciones de seguridad
-        inicio = max(0, inicio)  # No puede ser negativo
-        duracion_calculada = fin - inicio
-        
-        # Si excede duración máxima, ajustar
-        if duracion_calculada > duracion_maxima:
-            log_warning(f"⚠️ Segmento GPT-4o ({duracion_calculada:.1f}s) excede máximo ({duracion_maxima}s), ajustando...", func_name)
-            # Mantener el inicio, acortar el fin
-            fin = inicio + duracion_maxima
-            duracion_calculada = duracion_maxima
-            razon += " (ajustado a duración máxima)"
-        
-        # Si es muy corto (< 60s), expandir a 1 minuto mínimo (±30s del centro)
-        if duracion_calculada < 60:
-            log_warning(f"⚠️ Segmento GPT-4o corto ({duracion_calculada:.1f}s), expandiendo a 60s...", func_name)
-            centro = (inicio + fin) / 2
-            inicio = max(0, centro - 30)
-            fin = centro + 30
-            duracion_calculada = fin - inicio
-            razon += " (expandido a 1 minuto estándar)"
-        
-        resultado_final = {
-            'inicio': inicio,
-            'fin': fin,
-            'razon': razon,
-            'duracion': duracion_calculada
-        }
-        
-        log_info(f"✅ GPT-4o determinó segmento: {inicio:.1f}s - {fin:.1f}s ({duracion_calculada:.1f}s)", func_name)
-        log_info(f"📝 Razón: {razon}", func_name)
-        
-        # Mostrar en UI
-        st.success(f"🤖 **GPT-4o:** Segmento inteligente determinado: {inicio:.1f}s - {fin:.1f}s ({duracion_calculada:.1f}s)")
-        st.info(f"💡 **Razón:** {razon}")
-        
-        return resultado_final
-        
-    except json.JSONDecodeError as e:
-        log_warning(f"⚠️ Error parseando JSON de GPT-4o: {e}. Usando método tradicional", func_name)
-        # Fallback al método tradicional
-        return {
-            'inicio': max(0, timestamp_coincidencia - 30),
-            'fin': timestamp_coincidencia + 30,
-            'razon': 'Método tradicional (error en GPT-4o)',
-            'duracion': 60
-        }
-    
-    except Exception as e:
-        log_exception(func_name, e, f"Término: {termino_encontrado}, Timestamp: {timestamp_coincidencia}")
-        st.warning(f"⚠️ Error en análisis GPT-4o, usando método tradicional: {str(e)}")
-        
-        # Fallback al método tradicional
-        return {
-            'inicio': max(0, timestamp_coincidencia - 30),
-            'fin': timestamp_coincidencia + 30,
-            'razon': 'Método tradicional (error en GPT-4o)',
-            'duracion': 60
-        }
 
 def extraer_idea_general_segmento_gpt4(transcripcion_segmento, termino_encontrado, duracion_segundos):
     """
@@ -14633,7 +14403,7 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                         f.write(f"Fecha creación: {datetime.now().isoformat()}\n")
                         f.write(f"Archivo origen: {rel} ({tipo_archivo})\n")
                         f.write(f"Términos buscados: {', '.join(terminos_nombres)}\n")
-                        f.write(f"Generado por: Video Analyzer IA v5.7\n")
+                        f.write(f"Generado por: Video Analyzer IA v5.8\n")
             
                 # ========== GUARDAR TRANSCRIPCIÓN COMPLETA DEL VIDEO ==========
                 transcripcion_completa_path = os.path.join(archivo_main_dir, "TRANSCRIPCION_COMPLETA.txt")
@@ -14664,7 +14434,7 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                             f.write(f"- Total de palabras: {len(transcripcion_mistral.split())}\n")
                             f.write(f"- Total de caracteres: {len(transcripcion_mistral)}\n")
                             f.write(f"\n{'='*80}\n")
-                            f.write(f"✅ Generado automáticamente por Video Analyzer IA v5.7\n")
+                            f.write(f"✅ Generado automáticamente por Video Analyzer IA v5.8\n")
                     
                         log_info(f"✅ Transcripción completa guardada: {transcripcion_completa_path}", func_name)
                         if not mostrar_solo_relevantes:
@@ -14873,35 +14643,39 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                         idea_central_gemini = ""
                     
                         try:
-                            # Llamar a GEMINI 3 PRO para determinar el segmento más lógico
+                            # Cadena Kimi → DeepSeek → Gemini → GPT: segmento por idea (30–90s)
                             segmento_gemini = determinar_segmento_inteligente_sesion(
                                 transcripcion_con_timestamps=segments_timestamps,
                                 termino_encontrado=termino,
                                 timestamp_coincidencia=momento_termino,
-                                duracion_maxima=duracion_clip
+                                duracion_maxima=CLIP_SEG_MAX_S,
                             )
                         
                             # 🚫 VERIFICAR SI LA IA RECHAZÓ EL SEGMENTO
                             if segmento_gemini is None:
-                                # Prioritarios: clip mecánico (no desechar mención Intrant/Edesur real)
+                                # Prioritarios: clip mecánico 30s (no desechar mención Intrant real)
                                 if es_prioritario:
                                     log_warning(
-                                        f"⭐ IA rechazó '{termino}' pero es PRIORITARIO — clip forzado",
+                                        f"⭐ IA rechazó '{termino}' pero es PRIORITARIO — clip forzado 30s",
                                         func_name,
                                     )
                                     st.warning(
                                         f"⭐ '{termino}' prioritario: la IA lo marcó tangencial, "
                                         f"pero se genera clip de todas formas."
                                     )
-                                    _mitad = max(30.0, float(duracion_clip) / 2.0)
-                                    inicio = max(0.0, float(momento_termino) - _mitad)
-                                    fin_clip = inicio + float(duracion_clip)
+                                    inicio, fin_clip, duracion_clip_real = _clamp_segmento_por_idea(
+                                        float(momento_termino) - 15.0,
+                                        float(momento_termino) + 15.0,
+                                        float(momento_termino),
+                                        CLIP_SEG_MIN_S,
+                                        CLIP_SEG_MAX_S,
+                                    )
                                     if dur_total and fin_clip > float(dur_total):
                                         fin_clip = float(dur_total)
-                                        inicio = max(0.0, fin_clip - float(duracion_clip))
-                                    duracion_clip_real = fin_clip - inicio
+                                        inicio = max(0.0, fin_clip - CLIP_SEG_MIN_S)
+                                        duracion_clip_real = fin_clip - inicio
                                     razon_segmento = (
-                                        "Clip forzado (término prioritario); "
+                                        "Clip forzado 30s (término prioritario); "
                                         "la IA no halló desarrollo temático claro."
                                     )
                                     idea_central_gemini = (
@@ -14914,6 +14688,10 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                                         "duracion": duracion_clip_real,
                                         "razon": razon_segmento,
                                         "idea_central": idea_central_gemini,
+                                        "texto_idea": _texto_idea_desde_segmentos(
+                                            segments_timestamps, inicio, fin_clip
+                                        ),
+                                        "motor": "forzado-prioritario",
                                     }
                                 else:
                                     log_warning(f"🚫 Modelo rechazó el segmento para '{termino}' - Mención tangencial", func_name)
@@ -14979,35 +14757,57 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                             fin_clip = segmento_gemini['fin']
                             duracion_clip_real = segmento_gemini['duracion']
                             razon_segmento = segmento_gemini['razon']
-                            idea_central_gemini = segmento_gemini.get('idea_central', '')  # Nueva: idea centrada
-                        
-                            # 📏 EXPANSIÓN AUTOMÁTICA: Si el usuario pide 90s y la IA da menos, expandir
-                            # Esto cumple con el requisito de "no quiero videos de menos de 90"
-                            if duracion_clip_real < duracion_clip:
-                                log_info(f"📏 Expandiendo clip de {duracion_clip_real:.1f}s a {duracion_clip:.1f}s", func_name)
-                                dif = duracion_clip - duracion_clip_real
-                                inicio = max(0, inicio - (dif / 2))
-                                fin_clip = inicio + duracion_clip
-                                duracion_clip_real = duracion_clip
-                                razon_segmento += f" (Expandido para cumplir {duracion_clip}s)"
-                        
-                            log_info(f"✅ Gemini 3 Pro determinó segmento inteligente:", func_name)
+                            idea_central_gemini = segmento_gemini.get('idea_central', '')
+                            texto_idea_seg = segmento_gemini.get('texto_idea', '') or ''
+                            motor_seg = segmento_gemini.get('motor', 'IA')
+
+                            # Clamp final 30–90s desde el hit (sin expandir a lo loco a duracion_clip)
+                            inicio, fin_clip, duracion_clip_real = _clamp_segmento_por_idea(
+                                inicio, fin_clip, momento_termino, CLIP_SEG_MIN_S, CLIP_SEG_MAX_S
+                            )
+                            if not texto_idea_seg:
+                                texto_idea_seg = _texto_idea_desde_segmentos(
+                                    segments_timestamps, inicio, fin_clip
+                                )
+
+                            st.markdown("### 🎬 Segmento por idea (antes del corte)")
+                            st.caption(
+                                f"Motor: **{motor_seg}** · Hit: `{momento_termino:.1f}s` · "
+                                f"Clip: `{inicio:.1f}s`–`{fin_clip:.1f}s` ({duracion_clip_real:.1f}s)"
+                            )
+                            if idea_central_gemini:
+                                st.info(f"💡 **Idea central:** {idea_central_gemini}")
+                            if texto_idea_seg:
+                                st.markdown("**📝 Texto extraído del tramo:**")
+                                st.write(texto_idea_seg[:2500])
+
+                            log_info(f"✅ Segmento inteligente por idea ({motor_seg}):", func_name)
                             log_info(f"  - Inicio: {inicio:.2f}s", func_name)
                             log_info(f"  - Fin: {fin_clip:.2f}s", func_name)
                             log_info(f"  - Duración: {duracion_clip_real:.2f}s", func_name)
                             log_info(f"  - Razón: {razon_segmento}", func_name)
                             if idea_central_gemini:
                                 log_info(f"  - Idea central: {idea_central_gemini[:100]}...", func_name)
+                            if texto_idea_seg:
+                                log_info(f"  - Texto idea: {texto_idea_seg[:120]}...", func_name)
                         
                         except Exception as e:
-                            # Fallback al método tradicional si Gemini falla
-                            log_warning(f"⚠️ Error en Gemini, usando método tradicional: {e}", func_name)
-                            st.warning(f"⚠️ Gemini no disponible, usando método tradicional")
-                        
-                            inicio = max(0, momento_termino - buffer_anterior)
-                            fin_clip = inicio + duracion_clip
-                            duracion_clip_real = duracion_clip
-                            razon_segmento = "Método tradicional (centrado en coincidencia)"
+                            # Fallback corto: 30s alrededor del hit (no 90s)
+                            log_warning(f"⚠️ Cadena de segmento falló, fallback 30s: {e}", func_name)
+                            st.warning(f"⚠️ Sin motor de segmento — fallback 30s alrededor del hit")
+                            inicio, fin_clip, duracion_clip_real = _clamp_segmento_por_idea(
+                                momento_termino - 15, momento_termino + 15,
+                                momento_termino, CLIP_SEG_MIN_S, CLIP_SEG_MAX_S,
+                            )
+                            razon_segmento = "Fallback 30s (cadena Kimi→DeepSeek→Gemini→GPT falló)"
+                            idea_central_gemini = mejor_texto_contexto or ""
+                            texto_idea_seg = _texto_idea_desde_segmentos(
+                                segments_timestamps, inicio, fin_clip
+                            )
+                            st.markdown("### 🎬 Segmento fallback (30s)")
+                            st.caption(f"Hit `{momento_termino:.1f}s` → `{inicio:.1f}s`–`{fin_clip:.1f}s`")
+                            if texto_idea_seg:
+                                st.write(texto_idea_seg[:1500])
                     
                         # VERIFICAR LÍMITES DEL VIDEO: Asegurar que no se exceda la duración del video
                         try:
@@ -15459,7 +15259,7 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                         
                             # === GUARDIA: Verificar duración mínima del clip (90s) antes de enviar ===
                             # El usuario es estricto: "no quiero videos de menos de 90"
-                            MIN_DURACION_CLIP_ENVIO = 90  # segundos (restaurado a 90)
+                            MIN_DURACION_CLIP_ENVIO = 30  # mínimo por idea (30–90s)
                             _clip_ok_para_enviar = True
                             if clip_path and os.path.exists(clip_path):
                                 try:
@@ -15533,7 +15333,8 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                         # Guardar transcripción en archivo TXT (ruta física del .mp4, aunque no se adjunte en envíos)
                         txt_path = _clip_disk_path.replace(".mp4", ".txt")
                     
-                        buffer_posterior = duracion_clip - buffer_anterior
+                        buffer_antes_real = max(0.0, float(mejor_timestamp['start']) - float(inicio))
+                        buffer_despues_real = max(0.0, float(fin_clip) - float(mejor_timestamp['start']))
                         with open(txt_path, "w", encoding="utf-8") as tf:
                             tf.write(f"""TRANSCRIPCIÓN COMPLETA DEL {tipo_archivo.upper()}
         ===============================================
@@ -15544,15 +15345,16 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
         FECHA ANÁLISIS: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
         ===============================================
-        CONFIGURACIÓN DEL CLIP:
+        CONFIGURACIÓN DEL CLIP (segmento por idea 30–90s):
         ===============================================
 
         - Archivo de {tipo_archivo.lower()}: {clip_name}
-        - Duración total del clip: {duracion_clip} segundos ({duracion_clip//60}:{duracion_clip%60:02d})
-        - Tiempo antes de coincidencia: {buffer_anterior} segundos ({buffer_anterior//60}:{buffer_anterior%60:02d})
-        - Tiempo después de coincidencia: {buffer_posterior} segundos ({buffer_posterior//60}:{buffer_posterior%60:02d})
+        - Duración real del clip: {duracion_clip_real:.1f} segundos
+        - Tiempo antes de coincidencia: {buffer_antes_real:.1f}s
+        - Tiempo después de coincidencia: {buffer_despues_real:.1f}s
         - Tiempo de inicio del clip: {inicio:.2f}s
         - Momento de coincidencia: {mejor_timestamp['start']:.2f}s
+        - Idea central: {idea_central_gemini}
         - API de transcripción utilizada: Mistral/OpenAI Whisper
 
         ===============================================
@@ -16649,7 +16451,7 @@ with tab4:
         st.markdown("### 🏢 Entidades y Rutas de Envío")
     with col_header2:
         if MODO_SOLO_INTRANT:
-            st.caption("v5.7: solo Intrant")
+            st.caption("v5.8: solo Intrant")
         elif st.button("➕ Nueva Entidad", type="primary", key="btn_abrir_nueva"):
             st.session_state['mostrar_form_nueva'] = not st.session_state.get('mostrar_form_nueva', False)
     

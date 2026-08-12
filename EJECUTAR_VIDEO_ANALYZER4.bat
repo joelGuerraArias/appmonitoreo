@@ -1,10 +1,10 @@
 @echo off
 chcp 65001 >nul
-title Video Analyzer v5.7 Intrant
+title Video Analyzer v5.8 Intrant
 
 echo.
 echo ==============================================
-echo   VIDEO ANALYZER v5.7 Intrant
+echo   VIDEO ANALYZER v5.8 Intrant
 echo   http://localhost:8501
 echo ==============================================
 echo.

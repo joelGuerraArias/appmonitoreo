@@ -25,8 +25,8 @@
       "cliente_id": "intrant"
     }
   ],
-  "fecha_actualizacion": "2026-08-12T08:25:00",
+  "fecha_actualizacion": "2026-08-12T08:35:00",
   "total_terminos": 6,
   "modo": "solo_intrant",
-  "version": "5.8"
+  "version": "5.9"
 }

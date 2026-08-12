@@ -2,6 +2,16 @@
 
 ## 📌 Cambios automáticos
 
+- [2026-08-12 08:35] FEAT: Video Analyzer v5.9
+  - R2 primario + Cloudinary también (fallback): clips suben a Cloudflare R2 primero y también a Cloudinary. Supabase/Telegram/Sheets priorizan R2 → Cloudinary → Bunny. Restaura vars R2_ENDPOINT/BUCKET si faltan en `.env`.
+
+---
+
+- [2026-08-12 08:30] MOD: R2 primario + Cloudinary también → Supabase
+  - Clips: sube primero a Cloudflare R2 y también a Cloudinary (fallback si R2 falla). Supabase `url_video`/`enlace_directo` priorizan R2 → Cloudinary → Bunny. Telegram/Sheets usan el mismo orden.
+
+---
+
 - [2026-08-12 08:25] FEAT: Video Analyzer v5.8
   - Clips por idea (30–90s): cadena Kimi→DeepSeek→Gemini→GPT; UI muestra idea_central/texto_idea antes del corte; sin expansión ciega a 90s; mínimo de envío 30s. Arrancador con blindaje si `appMonitoreo.py` queda vacío. Next: bootstrap solo en instrumentation.
 

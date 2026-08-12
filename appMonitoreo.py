@@ -542,8 +542,8 @@ CLOUDINARY_CONFIG = os.path.join(CARPETA_PROCESADOS, "cloudinary_config.json")  
 BUNNY_CONFIG = os.path.join(CARPETA_PROCESADOS, "bunny_config.json")  # Configuración de Bunny.net Storage
 CACHE_ESCANEO = os.path.join(CARPETA_PROCESADOS, "cache_escaneo.json")  # Caché de archivos escaneados
 CLIENTES_CONFIG = str(_DIR_SCRIPT / "clientes_config.json")
-# v5.8 Intrant: un solo cliente. Evita reaparición de EDESUR/MINERD/Presidencia y correos ajenos.
-APP_VERSION = "5.8"
+# v5.9 Intrant: un solo cliente. Evita reaparición de EDESUR/MINERD/Presidencia y correos ajenos.
+APP_VERSION = "5.9"
 MODO_SOLO_INTRANT = True
 CLIENTE_ID_UNICO = "intrant"
 TERMINOS_INTRANT_CANONICOS = (
@@ -1547,7 +1547,7 @@ def _enviar_correo_autosemana_aviso(asunto, cuerpo_texto, cliente=None):
 
 
 def obtener_cliente_default():
-    """Compat: ya no devuelve EDESUR. En v5.8+ es Intrant."""
+    """Compat: ya no devuelve EDESUR. En v5.9+ es Intrant."""
     c = None
     try:
         if os.path.exists(CLIENTES_CONFIG):
@@ -1562,7 +1562,7 @@ def obtener_cliente_default():
 
 
 def obtener_cliente_en_analisis():
-    """Cliente de monitoreo: siempre Intrant en v5.8. Canales con credenciales quedan activos."""
+    """Cliente de monitoreo: siempre Intrant en v5.9. Canales con credenciales quedan activos."""
     if MODO_SOLO_INTRANT:
         c = obtener_cliente_por_id(CLIENTE_ID_UNICO) or obtener_cliente_default()
         if c:
@@ -1655,7 +1655,7 @@ def crear_cliente_nuevo(nombre, color='#4CAF50'):
 def agregar_cliente(cliente):
     """Agrega un nuevo cliente a la lista"""
     if MODO_SOLO_INTRANT:
-        return False, "v5.8 Intrant: no se pueden agregar otros clientes"
+        return False, "v5.9 Intrant: no se pueden agregar otros clientes"
     clientes = cargar_clientes()
     # Verificar que no exista un cliente con el mismo nombre
     for c in clientes:
@@ -1669,7 +1669,7 @@ def agregar_cliente(cliente):
 def actualizar_cliente(cliente_id, datos_actualizados):
     """Actualiza un cliente existente"""
     if MODO_SOLO_INTRANT and (cliente_id or '').strip().lower() != CLIENTE_ID_UNICO:
-        return False, "v5.8 Intrant: solo se puede editar Intrant"
+        return False, "v5.9 Intrant: solo se puede editar Intrant"
     clientes = cargar_clientes()
     for i, cliente in enumerate(clientes):
         if cliente.get('id') == cliente_id:
@@ -1686,9 +1686,9 @@ def actualizar_cliente(cliente_id, datos_actualizados):
 def eliminar_cliente(cliente_id):
     """Elimina un cliente de la lista"""
     if (cliente_id or '').strip().lower() == CLIENTE_ID_UNICO:
-        return False, "No se puede eliminar Intrant (cliente único v5.8)"
+        return False, "No se puede eliminar Intrant (cliente único v5.9)"
     if MODO_SOLO_INTRANT:
-        return False, "v5.8 Intrant: no hay otros clientes que eliminar"
+        return False, "v5.9 Intrant: no hay otros clientes que eliminar"
     clientes = cargar_clientes()
     clientes_filtrados = [c for c in clientes if c.get('id') != cliente_id]
     if len(clientes_filtrados) == len(clientes):
@@ -1698,7 +1698,7 @@ def eliminar_cliente(cliente_id):
     return False, "Error eliminando cliente"
 
 def obtener_clientes_activos():
-    """Retorna clientes activos. v5.8: solo Intrant (nunca recrea EDESUR)."""
+    """Retorna clientes activos. v5.9: solo Intrant (nunca recrea EDESUR)."""
     if MODO_SOLO_INTRANT:
         asegurar_modo_solo_intrant()
         clientes = cargar_clientes()
@@ -2004,11 +2004,11 @@ def enviar_telegram_cliente(cliente, mensaje, video_path=None, parse_mode='Markd
     # Enviar video si existe
     if video_path and os.path.exists(video_path) and telegram_config.get('send_clips', True):
         use_cloudinary = telegram_config.get('use_cloudinary', True)
-        # Mismo orden que antes: Cloudinary primero; Bunny solo si no hay URL de Cloudinary
-        url_cdn_existente = video_url or video_url_bunny or video_url_r2
+        # Prioridad CDN: R2 → Cloudinary → Bunny
+        url_cdn_existente = video_url_r2 or video_url or video_url_bunny
         
         if url_cdn_existente and use_cloudinary:
-            log_info(f"Usando URL CDN existente (Cloudinary o Bunny): {url_cdn_existente}", func_name)
+            log_info(f"Usando URL CDN existente (R2/Cloudinary/Bunny): {url_cdn_existente}", func_name)
             exito, msg, _ = enviar_video_telegram_url(url_cdn_existente, caption_limpio, chat_id, bot_token, None)
             resultados.append(('Video', exito, msg))
         else:
@@ -2027,15 +2027,26 @@ def enviar_telegram_cliente(cliente, mensaje, video_path=None, parse_mode='Markd
             exito, msg, _ = enviar_video_telegram(video_path, caption_limpio, chat_id, bot_token, use_cloudinary)
             resultados.append(('Video', exito, msg))
         vr2 = (video_url_r2 or "").strip()
+        vcloud = (video_url or "").strip()
+        # Si el CDN principal fue R2, avisar también la copia Cloudinary (y viceversa)
         if vr2 and url_cdn_existente and url_cdn_existente.strip() != vr2:
             try:
                 ex2, ms2 = enviar_mensaje_telegram(
                     escape_telegram_text(f"Copia Cloudflare R2:\n{vr2}"),
                     chat_id, bot_token, None,
                 )
-                resultados.append(('R2-enlace', ex2, ms2))
-            except Exception as _e_r2:
-                resultados.append(('R2-enlace', False, str(_e_r2)[:120]))
+                resultados.append(('Video R2 link', ex2, ms2))
+            except Exception as e_r2tg:
+                log_warning(f"No se pudo enviar link R2 a Telegram: {e_r2tg}", func_name)
+        elif vcloud and url_cdn_existente and url_cdn_existente.strip() != vcloud:
+            try:
+                ex2, ms2 = enviar_mensaje_telegram(
+                    escape_telegram_text(f"Copia Cloudinary:\n{vcloud}"),
+                    chat_id, bot_token, None,
+                )
+                resultados.append(('Video Cloudinary link', ex2, ms2))
+            except Exception as e_ctg:
+                log_warning(f"No se pudo enviar link Cloudinary a Telegram: {e_ctg}", func_name)
     elif video_path and os.path.exists(video_path) and not telegram_config.get('send_clips', True):
         log_info("Clip disponible pero send_clips=false: no se envía video (solo resumen si está habilitado)", func_name)
         resultados.append(('Video', True, 'Omitido: send_clips desactivado en configuración'))
@@ -4180,6 +4191,10 @@ def enviar_coincidencia_a_cliente(cliente, nombre_archivo, termino_encontrado, c
                     'timestamp': timestamp
                 }
                 url_supa, enlace_supa = _urls_video_enlace_supabase(video_url, video_url_bunny, video_url_r2)
+                st.caption(
+                    f"Supabase urls — primario (R2→Cloudinary→Bunny): `{url_supa or '—'}` · "
+                    f"enlace_directo: `{enlace_supa or '—'}`"
+                )
                 exito, msg = enviar_supabase_cliente(
                     cliente, [coincidencia_item], nombre_archivo, tipo_archivo,
                     resumen_ejecutivo, transcripcion_completa, url_supa, enlace_supa
@@ -4211,7 +4226,7 @@ def enviar_coincidencia_a_cliente(cliente, nombre_archivo, termino_encontrado, c
                 sent_gs = analizar_sentimiento_mencion_heuristica(texto_gs)
                 url_gs = (
                     (link_drive_video_coincidencia or "").strip()
-                    or (video_url or video_url_r2 or "").strip()
+                    or (video_url_r2 or video_url or "").strip()
                 )
                 rango = (gs.get("range") or "Hoja 1!A:G").strip()
                 fila, incluir_indice, formato = construir_fila_google_sheet_cliente(
@@ -4865,36 +4880,48 @@ def enviar_coincidencia_inmediata(nombre_archivo, termino_encontrado, contexto_t
         st.info(f"📤 **Enviando coincidencia a cliente: {cliente_nombre}**")
         log_info(f"Cliente detectado para término '{termino_encontrado}': {cliente_nombre}", func_name)
         
-        # 🆕 SUBIR VIDEO A CLOUDINARY (solo si no se pasó ya o si el cliente tiene su propia cuenta)
-        video_url_cloudinary = None
-        if clip_path and os.path.exists(clip_path):
-            cloudinary_config = cliente.get('cloudinary', {})
-            # Solo subir si el cliente tiene Cloudinary habilitado
-            if cloudinary_config.get('enabled'):
-                try:
-                    # Si ya tenemos un url y el cloud_name es el mismo que el global, no hace falta re-subir
-                    global_cloud_name = os.getenv('CLOUDINARY_CLOUD_NAME', '')
-                    if video_url and cloudinary_config.get('cloud_name') == global_cloud_name and global_cloud_name != '':
-                        log_info(f"⏭️ Usando URL global de Cloudinary para cliente {cliente_nombre}", func_name)
-                        video_url_cloudinary = video_url
-                    else:
-                        # Configurar Cloudinary del cliente (puede ser otra cuenta)
-                        cloudinary.config(
-                            cloud_name=cloudinary_config['cloud_name'],
-                            api_key=cloudinary_config['api_key'],
-                            api_secret=cloudinary_config['api_secret']
-                        )
-                        
-                        st.info("☁️ Subiendo video a Cloudinary (Client Specific)...")
+        # CDN: R2 primero + Cloudinary también (fallback si R2 falla)
+        video_url_cloudinary = (video_url or "").strip() or None
+        video_url_r2 = None
+        pre_r2 = (video_url_r2_precargada or "").strip()
+        if pre_r2:
+            video_url_r2 = pre_r2
+            log_info("⏭️ R2: misma URL que la subida en paralelo al clip (no se vuelve a subir)", func_name)
+            # Aun con R2 precargado, subir a Cloudinary si aún no hay URL
+            if (not video_url_cloudinary) and clip_path and os.path.exists(clip_path):
+                cloudinary_config = cliente.get('cloudinary', {})
+                if cloudinary_config.get('enabled', True) is not False:
+                    try:
+                        st.info("☁️ Subiendo video a Cloudinary (backup)...")
+                        if cloudinary_config.get('cloud_name'):
+                            cloudinary.config(
+                                cloud_name=cloudinary_config['cloud_name'],
+                                api_key=cloudinary_config.get('api_key', ''),
+                                api_secret=cloudinary_config.get('api_secret', ''),
+                                secure=True,
+                            )
                         video_url_cloudinary, upload_msg = subir_video_cloudinary(clip_path, termino_encontrado)
-                        
                         if video_url_cloudinary:
-                            log_info(f"✅ Video subido a Cloudinary Cliente: {video_url_cloudinary}", func_name)
-                            st.success(f"☁️ Video subido a Cloudinary del cliente")
+                            st.success("☁️ Video subido a Cloudinary (backup)")
                         else:
-                            log_warning(f"⚠️ Error subiendo a Cloudinary: {upload_msg}", func_name)
-                except Exception as e:
-                    log_warning(f"⚠️ Error configurando/subiendo a Cloudinary: {e}", func_name)
+                            log_warning(f"⚠️ Cloudinary: {upload_msg}", func_name)
+                    except Exception as e:
+                        log_warning(f"⚠️ Error Cloudinary backup: {e}", func_name)
+        elif clip_path and os.path.exists(clip_path):
+            st.info("☁️ Subiendo clip a R2 (primario) + Cloudinary (también)...")
+            u_r2, u_c, det = subir_clip_r2_y_cloudinary(
+                clip_path, termino_encontrado, timestamp=timestamp, cliente=cliente
+            )
+            video_url_r2 = u_r2
+            if u_c:
+                video_url_cloudinary = u_c
+            log_info(f"CDN clip: {det}", func_name)
+            if video_url_r2:
+                st.success("☁️ Video subido a Cloudflare R2")
+            if video_url_cloudinary:
+                st.success("☁️ Video subido a Cloudinary")
+            if not video_url_r2 and not video_url_cloudinary:
+                st.warning(f"⚠️ Sin URL CDN: {det}")
         
         if (not video_url_bunny) and clip_path and os.path.exists(clip_path):
             bunny_eff = _bunny_config_resuelta(cliente.get('bunny') or {})
@@ -4912,39 +4939,20 @@ def enviar_coincidencia_inmediata(nombre_archivo, termino_encontrado, contexto_t
                 except Exception as e:
                     log_warning(f"⚠️ Error subiendo a Bunny: {e}", func_name)
 
-        video_url_r2 = None
-        pre_r2 = (video_url_r2_precargada or "").strip()
-        if pre_r2:
-            video_url_r2 = pre_r2
-            log_info("⏭️ R2: misma URL que la subida en paralelo al clip (no se vuelve a subir)", func_name)
-        elif clip_path and os.path.exists(clip_path) and _cliente_debe_subir_r2(cliente):
-            try:
-                st.info("☁️ Subiendo video a Cloudflare R2...")
-                video_url_r2, msg_r2 = subir_video_r2(
-                    clip_path,
-                    termino_encontrado,
-                    timestamp=timestamp,
-                    r2_cfg=(cliente.get("r2") or {}),
-                )
-                if video_url_r2:
-                    log_info(f"✅ Video subido a Cloudflare R2: {video_url_r2}", func_name)
-                    st.success("☁️ Video subido a Cloudflare R2")
-                else:
-                    log_warning(f"⚠️ R2: {msg_r2}", func_name)
-            except Exception as e:
-                log_warning(f"⚠️ Error subiendo a R2: {e}", func_name)
-
         _bunny_final = video_url_bunny
         _cloud_final = video_url_cloudinary or video_url
         with st.expander("📋 Paso A — URLs en la nube antes de Telegram / Drive / correo", expanded=True):
+            st.markdown(f"- **R2 (primario):** `{(video_url_r2 or '— sin URL')}`")
             st.markdown(
-                f"- **Cloudinary:** `{(_cloud_final or '— sin URL')}`"
+                f"- **Cloudinary (también/fallback):** `{(_cloud_final or '— sin URL')}`"
                 + (" *(Cloudinary desactivado en cliente o sin clip)*" if not _cloud_final else "")
             )
             st.markdown(f"- **Bunny:** `{(_bunny_final or '— sin URL')}`")
-            st.markdown(f"- **R2:** `{(video_url_r2 or '— sin URL')}`")
+            _u_supa, _e_supa = _urls_video_enlace_supabase(_cloud_final, _bunny_final, video_url_r2)
+            st.markdown(f"- **Supabase url_video:** `{(_u_supa or '—')}`")
+            st.markdown(f"- **Supabase enlace_directo:** `{(_e_supa or '—')}`")
 
-        # 🆕 ENVIAR A TODOS LOS DESTINOS DEL CLIENTE (con el URL de Cloudinary)
+        # 🆕 ENVIAR A TODOS LOS DESTINOS DEL CLIENTE (R2 primario + Cloudinary)
         resultados = enviar_coincidencia_a_cliente(
             cliente=cliente,
             nombre_archivo=nombre_archivo,
@@ -5087,14 +5095,82 @@ def _bunny_config_resuelta(bunny_cfg):
     return out
 
 def _urls_video_enlace_supabase(url_cloudinary, url_bunny, url_r2=None):
-    """Primera URL con contenido como campo principal de video; segunda como enlace alterno (orden: Cloudinary → Bunny → R2)."""
-    urls = [(url_cloudinary or "").strip(), (url_bunny or "").strip(), (url_r2 or "").strip()]
-    urls = [u for u in urls if u]
-    if not urls:
+    """url_video + enlace_directo para Supabase. Prioridad: R2 → Cloudinary → Bunny."""
+    urls = [(url_r2 or "").strip(), (url_cloudinary or "").strip(), (url_bunny or "").strip()]
+    # Deduplicar conservando orden
+    seen = set()
+    ordered = []
+    for u in urls:
+        if u and u not in seen:
+            seen.add(u)
+            ordered.append(u)
+    if not ordered:
         return "", ""
-    primary = urls[0]
-    secondary = urls[1] if len(urls) > 1 else primary
+    primary = ordered[0]
+    secondary = ordered[1] if len(ordered) > 1 else primary
     return primary, secondary
+
+
+def subir_clip_r2_y_cloudinary(video_path, termino="", timestamp=None, cliente=None):
+    """
+    Sube el clip a Cloudflare R2 (primario) y también a Cloudinary.
+    Si R2 falla, Cloudinary queda como URL usable (fallback).
+    Retorna (url_r2, url_cloudinary, detalle).
+    """
+    func_name = "subir_clip_r2_y_cloudinary"
+    url_r2 = None
+    url_cloud = None
+    notas = []
+    cli = cliente if isinstance(cliente, dict) else {}
+
+    if video_path and os.path.exists(video_path) and _cliente_debe_subir_r2(cli):
+        try:
+            url_r2, msg_r2 = subir_video_r2(
+                video_path,
+                termino,
+                timestamp=timestamp,
+                r2_cfg=(cli.get("r2") or {}),
+            )
+            if url_r2:
+                notas.append(f"R2 OK: {url_r2}")
+                log_info(f"✅ Clip subido a Cloudflare R2: {url_r2}", func_name)
+            else:
+                notas.append(f"R2 falló: {msg_r2}")
+                log_warning(f"⚠️ R2 falló (se usará Cloudinary si hay): {msg_r2}", func_name)
+        except Exception as e:
+            notas.append(f"R2 error: {e}")
+            log_warning(f"⚠️ Error subiendo a R2: {e}", func_name)
+    else:
+        notas.append("R2 omitido (no configurado / desactivado / sin archivo)")
+
+    # Siempre intentar Cloudinary también (backup / si R2 falló)
+    cloudinary_config = cli.get("cloudinary") or {}
+    try_cloud = True
+    if cloudinary_config and cloudinary_config.get("enabled") is False:
+        try_cloud = False
+    if try_cloud and video_path and os.path.exists(video_path):
+        try:
+            if cloudinary_config.get("cloud_name") and cloudinary_config.get("api_key"):
+                cloudinary.config(
+                    cloud_name=cloudinary_config["cloud_name"],
+                    api_key=cloudinary_config["api_key"],
+                    api_secret=cloudinary_config.get("api_secret") or "",
+                    secure=True,
+                )
+            url_cloud, msg_c = subir_video_cloudinary(video_path, termino, str(timestamp or ""))
+            if url_cloud:
+                notas.append(f"Cloudinary OK: {url_cloud}")
+                log_info(f"✅ Clip subido a Cloudinary: {url_cloud}", func_name)
+            else:
+                notas.append(f"Cloudinary falló: {msg_c}")
+                log_warning(f"⚠️ Cloudinary: {msg_c}", func_name)
+        except Exception as e:
+            notas.append(f"Cloudinary error: {e}")
+            log_warning(f"⚠️ Error subiendo a Cloudinary: {e}", func_name)
+    else:
+        notas.append("Cloudinary omitido")
+
+    return url_r2, url_cloud, " | ".join(notas)
 
 def subir_video_bunny(video_path, termino="", timestamp="", bunny_cfg=None):
     """Sube un video a Bunny Storage (PUT) y retorna la URL pública en el CDN."""
@@ -5931,7 +6007,7 @@ TRANSCRIPCIÓN COMPLETA:
 {transcripcion_completa}
 
 ===============================================
-GENERADO POR: Video Analyzer IA v5.8
+GENERADO POR: Video Analyzer IA v5.9
 ===============================================
 """
             
@@ -6184,9 +6260,10 @@ def enviar_coincidencias_a_supabase(coincidencias_items, nombre_archivo, tipo_ar
         for item in coincidencias_items:
             url_clip = item.get('url_cloudinary', url_video)
             url_bunny_item = item.get('url_bunny')
-            url_vid_reg, enl_reg = _urls_video_enlace_supabase(url_clip, url_bunny_item)
+            url_r2_item = item.get('url_r2')
+            url_vid_reg, enl_reg = _urls_video_enlace_supabase(url_clip, url_bunny_item, url_r2_item)
             if not url_vid_reg and enlace_directo:
-                url_vid_reg, enl_reg = _urls_video_enlace_supabase(enlace_directo, None)
+                url_vid_reg, enl_reg = _urls_video_enlace_supabase(enlace_directo, None, None)
             
             # ASEGURAR QUE NO HAYA NULLS - Usar valores por defecto
             # Timestamp actual en formato ISO 8601 para PostgreSQL
@@ -6672,7 +6749,7 @@ def generar_md_sesion_coincidencias(
         # ============================
         md.append(f"# 🎯 Reporte de Sesión - Coincidencias Detectadas")
         md.append(f"")
-        md.append(f"> **Video Analyzer IA v5.8** | Sesión: {fecha_legible}")
+        md.append(f"> **Video Analyzer IA v5.9** | Sesión: {fecha_legible}")
         md.append(f"")
         md.append(f"---")
         md.append(f"")
@@ -6857,7 +6934,7 @@ def generar_md_sesion_coincidencias(
         # ============================
         # PIE
         # ============================
-        md.append(f"_Reporte generado automáticamente por Video Analyzer IA v5.8 - {fecha_legible}_")
+        md.append(f"_Reporte generado automáticamente por Video Analyzer IA v5.9 - {fecha_legible}_")
         
         # === ESCRIBIR ARCHIVO ===
         contenido_final = "\n".join(md)
@@ -7938,7 +8015,7 @@ def generar_html_resumen_diario(coincidencias, cliente_nombre, corte_label, fech
         <!-- Footer -->
         <div style="background: #343a40; color: white; padding: 20px; border-radius: 0 0 16px 16px; text-align: center;">
             <p style="margin: 4px 0; opacity: 0.8; font-size: 13px;">
-                🤖 Resumen generado automáticamente por Video Analyzer IA v5.8
+                🤖 Resumen generado automáticamente por Video Analyzer IA v5.9
             </p>
             <p style="margin: 4px 0; opacity: 0.6; font-size: 12px;">
                 {datetime.now().strftime('%d/%m/%Y %H:%M:%S')} &middot; {cliente_nombre}
@@ -8700,7 +8777,7 @@ def enviar_clips_a_telegram(clips_generados, resumen, terminos_detectados, video
 📋 *RESUMEN EJECUTIVO:*
 {resumen}
 
-🌐 *Servidor:* Analizador de Videos IA v5.8
+🌐 *Servidor:* Analizador de Videos IA v5.9
 
 ⬇️ *Videos a continuación...*"""
         
@@ -8817,7 +8894,7 @@ def test_telegram_connection():
 
 ✅ Bot conectado correctamente
 ⏰ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-🤖 Analizador de Videos IA v5.8
+🤖 Analizador de Videos IA v5.9
 
 Este es un mensaje de prueba."""
     
@@ -8950,7 +9027,7 @@ def init_session_state():
     except Exception:
         pass
 
-# v5.8: purgar EDESUR/MINERD/Presidencia antes de la UI
+# v5.9: purgar EDESUR/MINERD/Presidencia antes de la UI
 try:
     asegurar_modo_solo_intrant()
 except Exception as _e_solo:
@@ -9212,9 +9289,9 @@ with col5:
     else:
         st.warning("📧 **Brevo** ⚠️\nNo configurado")
     
-st.title("🎬 Análisis Automático de Videos — v5.8 Intrant ✅")
+st.title("🎬 Análisis Automático de Videos — v5.9 Intrant ✅")
 st.info(
-    f"🧠 **v5.8 Intrant** | Solo cliente **Intrant** (sin EDESUR/MINERD/Presidencia). "
+    f"🧠 **v5.9 Intrant** | Solo cliente **Intrant** (sin EDESUR/MINERD/Presidencia). "
     f"Cadena: Kimi → GLM → Gemini/GPT-4o → DeepSeek. Preferido: **{obtener_etiqueta_motor_sesion()}**. "
     "Lun–vie: horarios de escaneo (sidebar). **06:00–09:00**, **21:00–24:00** y sáb/dom y CDN/TRA: todos."
 )
@@ -14403,7 +14480,7 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                         f.write(f"Fecha creación: {datetime.now().isoformat()}\n")
                         f.write(f"Archivo origen: {rel} ({tipo_archivo})\n")
                         f.write(f"Términos buscados: {', '.join(terminos_nombres)}\n")
-                        f.write(f"Generado por: Video Analyzer IA v5.8\n")
+                        f.write(f"Generado por: Video Analyzer IA v5.9\n")
             
                 # ========== GUARDAR TRANSCRIPCIÓN COMPLETA DEL VIDEO ==========
                 transcripcion_completa_path = os.path.join(archivo_main_dir, "TRANSCRIPCION_COMPLETA.txt")
@@ -14434,7 +14511,7 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                             f.write(f"- Total de palabras: {len(transcripcion_mistral.split())}\n")
                             f.write(f"- Total de caracteres: {len(transcripcion_mistral)}\n")
                             f.write(f"\n{'='*80}\n")
-                            f.write(f"✅ Generado automáticamente por Video Analyzer IA v5.8\n")
+                            f.write(f"✅ Generado automáticamente por Video Analyzer IA v5.9\n")
                     
                         log_info(f"✅ Transcripción completa guardada: {transcripcion_completa_path}", func_name)
                         if not mostrar_solo_relevantes:
@@ -15142,26 +15219,37 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                             except Exception as e_intro:
                                 log_warning(f"Intro clip omitida por error: {e_intro}", func_name)
                     
-                            # SUBIR CLIP A CLOUDINARY INMEDIATAMENTE
+                            # SUBIR CLIP: R2 (primario) + Cloudinary (también / fallback)
                             url_cloudinary_clip = None
-                            with st.spinner("☁️ Subiendo clip a Cloudinary..."):
+                            url_r2_clip = None
+                            _cli_clip = obtener_cliente_por_termino(termino)
+                            with st.spinner("☁️ Subiendo clip a R2 + Cloudinary..."):
                                 try:
-                                    cloudinary_configurado = configurar_cloudinary()
-                                    if cloudinary_configurado:
-                                        video_url_cloudinary, mensaje_cloudinary = subir_video_cloudinary(clip_path, termino)
-                                        if video_url_cloudinary:
-                                            url_cloudinary_clip = video_url_cloudinary
-                                            st.success(f"☁️ ✅ **CLIP subido a Cloudinary**: {video_url_cloudinary}")
-                                            log_info(f"Clip subido a Cloudinary: {video_url_cloudinary}", func_name)
+                                    if clip_path and os.path.exists(clip_path):
+                                        u_r2, u_c, det_cdn = subir_clip_r2_y_cloudinary(
+                                            clip_path,
+                                            termino,
+                                            timestamp=timestamp_actual,
+                                            cliente=_cli_clip,
+                                        )
+                                        url_r2_clip = u_r2
+                                        url_cloudinary_clip = u_c
+                                        if url_r2_clip:
+                                            st.success(f"☁️ ✅ **CLIP subido a Cloudflare R2**: {url_r2_clip}")
+                                        if url_cloudinary_clip:
+                                            st.success(f"☁️ ✅ **CLIP subido a Cloudinary**: {url_cloudinary_clip}")
+                                        if not url_r2_clip and not url_cloudinary_clip:
+                                            st.warning(f"⚠️ Sin URL CDN: {det_cdn}")
+                                            log_warning(f"Sin URL CDN tras R2+Cloudinary: {det_cdn}", func_name)
                                         else:
-                                            st.warning(f"⚠️ Error subiendo clip a Cloudinary: {mensaje_cloudinary}")
-                                            log_warning(f"Error subiendo clip a Cloudinary: {mensaje_cloudinary}", func_name)
-                                    else:
-                                        st.warning("⚠️ Cloudinary no está configurado")
-                                        log_warning("Cloudinary no está configurado para subir clip", func_name)
+                                            log_info(f"CDN clip: {det_cdn}", func_name)
+                                            _u_s, _e_s = _urls_video_enlace_supabase(
+                                                url_cloudinary_clip, None, url_r2_clip
+                                            )
+                                            st.caption(f"Supabase → url_video: {_u_s or '—'} | enlace: {_e_s or '—'}")
                                 except Exception as e:
-                                    st.warning(f"⚠️ Error subiendo clip a Cloudinary: {str(e)}")
-                                    log_warning(f"Error subiendo clip a Cloudinary: {str(e)}", func_name)
+                                    st.warning(f"⚠️ Error subiendo clip a R2/Cloudinary: {str(e)}")
+                                    log_warning(f"Error subiendo clip a R2/Cloudinary: {str(e)}", func_name)
                         
                             url_bunny_clip = None
                             with st.spinner("🐰 Subiendo clip a Bunny Storage..."):
@@ -15178,28 +15266,6 @@ def buscar_y_procesar_videos(duracion_clip=90, buffer_anterior=30):
                                 except Exception as e:
                                     st.warning(f"⚠️ Error subiendo clip a Bunny: {str(e)}")
                                     log_warning(f"Error subiendo clip a Bunny: {str(e)}", func_name)
-                        
-                            url_r2_clip = None
-                            _cli_clip = obtener_cliente_por_termino(termino)
-                            with st.spinner("☁️ Subiendo clip a Cloudflare R2..."):
-                                try:
-                                    if clip_path and os.path.exists(clip_path) and _cliente_debe_subir_r2(_cli_clip):
-                                        u_r2, msg_r2 = subir_video_r2(
-                                            clip_path,
-                                            termino,
-                                            timestamp=timestamp_actual,
-                                            r2_cfg=(_cli_clip.get("r2") or {}),
-                                        )
-                                        if u_r2:
-                                            url_r2_clip = u_r2
-                                            st.success(f"☁️ ✅ **CLIP subido a Cloudflare R2**: {u_r2}")
-                                            log_info(f"Clip subido a Cloudflare R2: {u_r2}", func_name)
-                                        else:
-                                            st.warning(f"⚠️ Error subiendo clip a R2: {msg_r2}")
-                                            log_warning(f"Error subiendo clip a R2: {msg_r2}", func_name)
-                                except Exception as e:
-                                    st.warning(f"⚠️ Error subiendo clip a R2: {str(e)}")
-                                    log_warning(f"Error subiendo clip a R2: {str(e)}", func_name)
                         
                             # Agregar a la lista de clips generados SOLO si pasó la verificación
                             clips_generados_en_sesion.append({
@@ -16451,7 +16517,7 @@ with tab4:
         st.markdown("### 🏢 Entidades y Rutas de Envío")
     with col_header2:
         if MODO_SOLO_INTRANT:
-            st.caption("v5.8: solo Intrant")
+            st.caption("v5.9: solo Intrant")
         elif st.button("➕ Nueva Entidad", type="primary", key="btn_abrir_nueva"):
             st.session_state['mostrar_form_nueva'] = not st.session_state.get('mostrar_form_nueva', False)
     
